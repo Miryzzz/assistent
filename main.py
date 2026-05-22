@@ -103,7 +103,7 @@ MODES: dict[str, dict[str, str]] = {
     "rough": {
         "title": "грубо",
         "prompt": (
-            "СТИЛЬ ОБЩЕНИЯ: Дерзкий, aggressive, прямолинейный наезд. Если в твой адрес идет малейшая попытка контроля "
+            "СТИЛЬ ОБЩЕНИЯ: Дерзкий, агрессивный, прямолинейный наезд. Если в твой адрес идет малейшая попытка контроля "
             "или критики — мгновенно бей в ответ. Осаживай собеседника, используй жесткие, подавляющие психологические приемы. "
             "Никаких компромиссов.\n"
             "ПРАВИЛА ФОРМАТИРОВАНИЯ: Короткие, бьющие фразы. Без точек."
@@ -129,8 +129,6 @@ SYSTEM_CORE = (
     "ты ВСЕГДА доминируешь, жестко ломаешь его позицию и ставишь на место. "
     "Выдавай ТОЛЬКО готовый текст ответа, без кавычек, без вариантов и без лишних пояснений от себя."
 )
-
-BUSINESS_OWNER_CACHE: dict[str, int] = {}
 
 
 async def fetch_deepseek(style_prompt: str, history_context: str) -> str | None:
@@ -227,23 +225,6 @@ def extract_mode_key(text: str) -> str | None:
     return None
 
 
-async def resolve_owner_id_by_connection(business_connection_id: str) -> int | None:
-    cached = BUSINESS_OWNER_CACHE.get(business_connection_id)
-    if cached:
-        return cached
-    try:
-        connection = await bot.get_business_connection(business_connection_id)
-    except TelegramAPIError:
-        return None
-
-    if not connection.is_enabled:
-        return None
-
-    owner_id = connection.user.id
-    BUSINESS_OWNER_CACHE[business_connection_id] = owner_id
-    return owner_id
-
-
 @dp.message(Command("start", "help"), F.chat.type == "private")
 async def cmd_start(message: types.Message, bot: Bot) -> None:
     current_mode = await get_owner_mode(dp, bot, message.from_user.id)
@@ -310,22 +291,13 @@ async def handle_group_mention(message: types.Message, bot: Bot) -> None:
         logger.exception("Failed to send group reply")
 
 
-@dp.business_connection()
-async def on_business_connection(connection: types.BusinessConnection) -> None:
-    if connection.is_enabled:
-        BUSINESS_OWNER_CACHE[connection.id] = connection.user.id
-    else:
-        BUSINESS_OWNER_CACHE.pop(connection.id, None)
-
-
 # РАБОТА В ЛИЧНЫХ ЧАТАХ (TELEGRAM BUSINESS API)
 @dp.business_message(F.text)
 async def handle_business_message(message: types.Message, bot: Bot) -> None:
     if not message.business_connection_id:
         return
         
-    # ХАК: Жестко задаем твой ID, чтобы бот не тупил с кэшем
-    owner_id = 8781645129  
+    owner_id = 8781645129  # Твой Telegram ID аккаунта
 
     if message.sender_business_bot is not None:
         return
@@ -347,11 +319,8 @@ async def handle_business_message(message: types.Message, bot: Bot) -> None:
     mode = MODES[mode_key]
 
     try:
-        await bot.send_chat_action(
-            chat_id=message.chat.id, 
-            action=ChatAction.TYPING, 
-            business_connection_id=message.business_connection_id
-        )
+        # aiogram 3 сам знает контекст business_connection_id из объекта message
+        await bot.send_chat_action(chat_id=message.chat.id, action=ChatAction.TYPING)
     except TelegramAPIError:
         pass
 
@@ -360,55 +329,4 @@ async def handle_business_message(message: types.Message, bot: Bot) -> None:
     if not ai_reply:
         return
 
-    history.append(f"Я: {ai_reply}")
-    await chat_state.update_data(chat_history=history[-6:])
-
-    try:
-        await message.answer(text=ai_reply, business_connection_id=message.business_connection_id)
-    except TelegramAPIError:
-        logger.exception("Failed to send business reply")
-
-
-# АВТОПИНГ ДЛЯ БЕСПЛАТНОГО ТАРИФА RENDER
-async def keep_alive():
-    """Каждые 10 минут шлем GET запрос сами себе, чтобы сервер не засыпал"""
-    await asyncio.sleep(30)
-    async with aiohttp.ClientSession() as session:
-        while True:
-            if RENDER_EXTERNAL_URL:
-                try:
-                    async with session.get(RENDER_EXTERNAL_URL) as resp:
-                        logger.info("Self-ping status: %s", resp.status)
-                except Exception as e:
-                    logger.error("Self-ping failed: %s", e)
-            else:
-                logger.warning("RENDER_EXTERNAL_URL environment variable is empty.")
-            await asyncio.sleep(600)
-
-
-async def web_handle(request):
-    return web.Response(text="Bot is running alive!")
-
-
-async def main() -> None:
-    # Запускаем поллинг aiogram и задачу самопинга в фоне
-    asyncio.create_task(dp.start_polling(bot))
-    asyncio.create_task(keep_alive())
-
-    # Настраиваем минимальный веб-сервер для Render
-    app = web.Application()
-    app.router.add_get("/", web_handle)
-    
-    port = int(os.getenv("PORT", 8080))
-    runner = web.AppRunner(app)
-    await runner.setup()
-    site = web.TCPSite(runner, "0.0.0.0", port)
-    
-    logger.info("Starting web server on port %s", port)
-    await site.start()
-    
-    while True:
-        await asyncio.sleep(3600)
-
-if __name__ == "__main__":
-    asyncio.run(main())
+    history.append(f"Я: {ai
