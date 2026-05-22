@@ -70,7 +70,7 @@ MODES: dict[str, dict[str, str]] = {
         "title": "официально",
         "prompt": (
             "СТИЛЬ ОБЩЕНИЯ: Ледяной деловой язык, безупречная и строгая грамотность. "
-            "Никакого панибратства, сленга и уступок. Твои интересы — в приоритете, отстаивай их аргументированно, "
+            "Никого панибратства, сленга и уступок. Твои интересы — в приоритете, отстаивай их аргументированно, "
             "четко и строго по делу. Спокойное, но давящее интеллектуальное превосходство.\n"
             "ПРАВИЛА ФОРМАТИРОВАНИЯ: Пиши строго с заглавных букв, соблюдай все правила пунктуации, ставь точки."
         ),
@@ -319,7 +319,6 @@ async def handle_business_message(message: types.Message, bot: Bot) -> None:
     mode = MODES[mode_key]
 
     try:
-        # aiogram 3 сам знает контекст business_connection_id из объекта message
         await bot.send_chat_action(chat_id=message.chat.id, action=ChatAction.TYPING)
     except TelegramAPIError:
         pass
@@ -329,4 +328,55 @@ async def handle_business_message(message: types.Message, bot: Bot) -> None:
     if not ai_reply:
         return
 
-    history.append(f"Я: {ai
+    history.append(f"Я: {ai_reply}")
+    await chat_state.update_data(chat_history=history[-6:])
+
+    try:
+        await message.answer(text=ai_reply)
+    except TelegramAPIError:
+        logger.exception("Failed to send business reply")
+
+
+# АВТОПИНГ ДЛЯ БЕСПЛАТНОГО ТАРИФА RENDER
+async def keep_alive():
+    """Каждые 10 минут шлем GET запрос сами себе, чтобы сервер не засыпал"""
+    await asyncio.sleep(30)
+    async with aiohttp.ClientSession() as session:
+        while True:
+            if RENDER_EXTERNAL_URL:
+                try:
+                    async with session.get(RENDER_EXTERNAL_URL) as resp:
+                        logger.info("Self-ping status: %s", resp.status)
+                except Exception as e:
+                    logger.error("Self-ping failed: %s", e)
+            else:
+                logger.warning("RENDER_EXTERNAL_URL environment variable is empty.")
+            await asyncio.sleep(600)
+
+
+async def web_handle(request):
+    return web.Response(text="Bot is running alive!")
+
+
+async def main() -> None:
+    # Запускаем поллинг aiogram и задачу самопинга в фоне
+    asyncio.create_task(dp.start_polling(bot))
+    asyncio.create_task(keep_alive())
+
+    # Настраиваем минимальный веб-сервер для Render
+    app = web.Application()
+    app.router.add_get("/", web_handle)
+    
+    port = int(os.getenv("PORT", 8080))
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, "0.0.0.0", port)
+    
+    logger.info("Starting web server on port %s", port)
+    await site.start()
+    
+    while True:
+        await asyncio.sleep(3600)
+
+if __name__ == "__main__":
+    asyncio.run(main())
