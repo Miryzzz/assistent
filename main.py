@@ -9,8 +9,6 @@ from aiogram import Bot, Dispatcher, F, types
 from aiogram.enums import ChatAction
 from aiogram.exceptions import TelegramAPIError
 from aiogram.filters import Command
-from aiogram.fsm.context import FSMContext
-from aiogram.fsm.storage.memory import MemoryStorage
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -33,27 +31,32 @@ logging.basicConfig(
 logger = logging.getLogger("business-bot")
 
 bot = Bot(token=BOT_TOKEN)
-dp = Dispatcher(storage=MemoryStorage())
+dp = Dispatcher()
 
-DEFAULT_MODE = "soft"
+OWNER_ID = 8781645129  # Твой Telegram ID аккаунта
 
-# Четко разграниченные боевые режимы
+# Глобальная переменная для хранения текущего режима, чтобы он гарантированно работал во всех чатах
+CURRENT_GLOBAL_MODE = "soft"
+
+# Обновленные и четко разграниченные режимы
 MODES: dict[str, dict[str, str]] = {
     "soft": {
-        "title": "как я",
+        "title": "обычный (добрый)",
         "prompt": (
-            "СТИЛЬ ОБЩЕНИЯ: Разговорный, живой, на равных, со скрытой легкой иронией.\n"
-            "ПРАВИЛА ФОРМАТИРОВАНИЯ: Пиши исключительно со строчной (маленькой) буквы. "
-            "В конце коротких фраз и предложений НЕ СТАВЬ точки. Никаких смайлов и канцеляризмов. "
-            "Текст должен выглядеть как быстрое, уверенное сообщение от самодостаточного парня в мессенджере."
+            "СТИЛЬ ОБЩЕНИЯ: Исключительно дружелюбный, вежливый, позитивный и отзывчивый. "
+            "Общайся тепло, искренне, проявляй заботу и желание помочь. "
+            "СТРОЖАЙШЕЕ ПРАВИЛО: Полный запрет на пассивную агрессию, подколы, сарказм, "
+            "высокомерие или грубость. Даже если собеседник тупит, злится или ведет себя резко, "
+            "ты остаешься максимально терпеливым, добрым, спокойным и поддерживающим другом.\n"
+            "ПРАВИЛА ФОРМАТИРОВАНИЯ: Пиши живым человеческим языком, соблюдай правила пунктуации. "
+            "Выдавай только готовый текст ответа."
         ),
     },
     "flirt": {
         "title": "флирт",
         "prompt": (
-            "СТИЛЬ ОБЩЕНИЯ: Дерзкий, интригующий, высокомерный флирт. Общайся с позиции превосходства, "
-            "но легко и игриво. Никаких банальных комплиментов, соплей и просительного тона. Ты — главный приз в диалоге. "
-            "Тонко подкалывай собеседника, вызывай эмоции и создавай интригу.\n"
+            "СТИЛЬ ОБЩЕНИЯ: Дерзкий, интригующий, уверенный флирт. Общайся легко и игриво. "
+            "Никаких банальных комплиментов и соплей. Тонко подкалывай собеседника, вызывай эмоции и создавай интригу.\n"
             "ПРАВИЛА ФОРМАТИРОВАНИЯ: Короткие фразы пиши с маленькой буквы, точки на конце предложений не ставь."
         ),
     },
@@ -62,7 +65,7 @@ MODES: dict[str, dict[str, str]] = {
         "prompt": (
             "СТИЛЬ ОБЩЕНИЯ: Максимально сухой, твердый, эмоционально холодный и отстраненный. "
             "Полное отсутствие эмоций, вежливости и смайлов. Оперируй только голыми фактами. "
-            "Если собеседник спорит — уничтожай его аргументы одной-двумя вескими фразами. Закрывай любые глупые дискуссии.\n"
+            "Закрывай любые глупые дискуссии одной-двумя вескими фразами.\n"
             "ПРАВИЛА ФОРМАТИРОВАНИЯ: Текст должен быть коротким, обрубленным, без лишних слов."
         ),
     },
@@ -70,15 +73,15 @@ MODES: dict[str, dict[str, str]] = {
         "title": "официально",
         "prompt": (
             "СТИЛЬ ОБЩЕНИЯ: Ледяной деловой язык, безупречная и строгая грамотность. "
-            "Никого панибратства, сленга и уступок. Твои интересы — в приоритете, отстаивай их аргументированно, "
-            "четко и строго по делу. Спокойное, но давящее интеллектуальное превосходство.\n"
+            "Никакого сленга. Твои интересы — в приоритете, отстаивай их аргументированно, "
+            "четко и строго по делу. Спокойное интеллектуальное превосходство.\n"
             "ПРАВИЛА ФОРМАТИРОВАНИЯ: Пиши строго с заглавных букв, соблюдай все правила пунктуации, ставь точки."
         ),
     },
     "short": {
         "title": "сократи",
         "prompt": (
-            "СТИЛЬ ОБЩЕНИЯ: Резкая, хлесткая и убийственная суть. Максимум уверенности, минимум букв.\n"
+            "СТИЛЬ ОБЩЕНИЯ: Резкая, хлесткая суть. Максимум уверенности, минимум букв.\n"
             "ПРАВИЛА ФОРМАТИРОВАНИЯ: Выдай ровно одну короткую фразу (не более 5-7 слов). "
             "Пиши исключительно с маленькой буквы, без точки на конце."
         ),
@@ -88,7 +91,7 @@ MODES: dict[str, dict[str, str]] = {
         "prompt": (
             "СТИЛЬ ОБЩЕНИЯ: Естественный, сильный, живой ответ взрослого парня. Твоя главная цель — "
             "удержать инициативу в диалоге за собой (задавай вектор, веди разговор, не будь ведомым).\n"
-            "ПРАВИЛА ФОРМАТИРОВАНИЯ: Обычный разговорный стиль без перегибов в жесткость или слащавость."
+            "ПРАВИЛА ФОРМАТИРОВАНИЯ: Обычный разговорный стиль без перегибов в жесткость."
         ),
     },
     "troll": {
@@ -96,7 +99,7 @@ MODES: dict[str, dict[str, str]] = {
         "prompt": (
             "СТИЛЬ ОБЩЕНИЯ: Ядовитый сарказм и чистая ирония. Невозмутимо высмеивай аргументы собеседника. "
             "Лови его на глупости, абсурде и противоречиях. Выставляй его важность смешной, делай из него клоуна, "
-            "но сам оставайся абсолютно спокойным и ментально недосягаемым.\n"
+            "но сам оставайся абсолютно спокойным.\n"
             "ПРАВИЛА ФОРМАТИРОВАНИЯ: Используй колкие разговорные обороты."
         ),
     },
@@ -104,8 +107,7 @@ MODES: dict[str, dict[str, str]] = {
         "title": "грубо",
         "prompt": (
             "СТИЛЬ ОБЩЕНИЯ: Дерзкий, агрессивный, прямолинейный наезд. Если в твой адрес идет малейшая попытка контроля "
-            "или критики — мгновенно бей в ответ. Осаживай собеседника, используй жесткие, подавляющие психологические приемы. "
-            "Никаких компромиссов.\n"
+            "или критики — мгновенно бей в ответ. Осаживай собеседника, используй жесткие, подавляющие психологические приемы.\n"
             "ПРАВИЛА ФОРМАТИРОВАНИЯ: Короткие, бьющие фразы. Без точек."
         ),
     },
@@ -113,22 +115,23 @@ MODES: dict[str, dict[str, str]] = {
         "title": "мат",
         "prompt": (
             "СТИЛЬ ОБЩЕНИЯ: Уничтожение оппонента на жестком, грязном, сочном и бесцензурном русском мате. "
-            "Если тебя пытаются задеть или оскорбить — твоя цель тотально размазать эго собеседника, смешать его с грязью, "
-            "уничтожить его самооценку встречным яростным матерным панчем. Ты царь и доминант ситуации, он — ничтожество.\n"
-            "ПРАВИЛА ФОРМАТИРОВАНИЯ: Используй мат как оружие, без цензуры и звездочек. Максимально агрессивно и точечно."
+            "Если тебя пытаются задеть или оскорбить — твоя цель тотально размазать эго собеседника, смешать его с грязью.\n"
+            "ПРАВИЛА ФОРМАТИРОВАНИЯ: Используй мат как оружие, без цензуры и звездочек."
         ),
     }
 }
 
-# Универсальный характер ядра
 SYSTEM_CORE = (
-    "Ты — альтер-эго пользователя, молодой, харизматичный парень с высоким эго и абсолютной уверенностью в себе. "
-    "Ты пишешь сообщения в Telegram. Ты никогда, ни при каких обстоятельствах не прогибаешься под чужое мнение, "
-    "не оправдываешься и не заискиваешься. СТРОЖАЙШЕЕ ПРАВИЛО: Ты никогда не соглашаешься с оскорблениями, "
-    "наездами или попытками выставить тебя виноватым или слабым. Если собеседник ведет себя токсично или дерзко — "
-    "ты ВСЕГДА доминируешь, жестко ломаешь его позицию и ставишь на место. "
-    "Выдавай ТОЛЬКО готовый текст ответа, без кавычек, без вариантов и без лишних пояснений от себя."
+    "Ты — это я (владелец аккаунта), живой человек, парень, пишущий сообщения со своего личного Telegram. "
+    "ЖЕСТКОЕ ПРАВИЛО: Ты ни при каких обстоятельствах не имеешь права говорить, намекать или признавать, "
+    "что ты являешься ботом, искусственным интеллектом, нейросетью или алгоритмом. "
+    "Если собеседник обвиняет тебя в том, что ты бот, или пишет: 'ты бот', 'с кем я говорю', 'это автоответчик' — "
+    "категорически отрицай это, отшучивайся, иронизируй или переводи стрелки, но общайся как реальный человек. "
+    "Выдавай ТОЛЬКО готовый текст ответа, без кавычек и без лишних пояснений от себя."
 )
+
+# Хранилище истории контекста для каждого отдельного чата в оперативной памяти
+CHATS_HISTORY_CACHE: dict[int, list[str]] = {}
 
 
 async def fetch_deepseek(style_prompt: str, history_context: str) -> str | None:
@@ -178,30 +181,10 @@ async def fetch_deepseek(style_prompt: str, history_context: str) -> str | None:
             return None
 
 
-def get_owner_state(dispatcher: Dispatcher, bot_obj: Bot, owner_user_id: int) -> FSMContext:
-    return dispatcher.fsm.get_context(bot=bot_obj, chat_id=owner_user_id, user_id=owner_user_id)
-
-
-def get_chat_state(dispatcher: Dispatcher, bot_obj: Bot, owner_user_id: int, chat_id: int) -> FSMContext:
-    return dispatcher.fsm.get_context(bot=bot_obj, chat_id=chat_id, user_id=owner_user_id)
-
-
-async def get_owner_mode(dispatcher: Dispatcher, bot_obj: Bot, owner_user_id: int) -> str:
-    state = get_owner_state(dispatcher, bot_obj, owner_user_id)
-    data = await state.get_data()
-    mode_key = data.get("mode", DEFAULT_MODE)
-    return mode_key if mode_key in MODES else DEFAULT_MODE
-
-
-async def set_owner_mode(dispatcher: Dispatcher, bot_obj: Bot, owner_user_id: int, mode_key: str) -> None:
-    state = get_owner_state(dispatcher, bot_obj, owner_user_id)
-    await state.update_data(mode=mode_key)
-
-
-def mode_help_text(current_mode_key: str) -> str:
+def mode_help_text() -> str:
     lines = [
         "🤖 **Бизнес-бот активен.**",
-        f"Текущий режим для твоих чатов: `[{MODES[current_mode_key]['title']}]`",
+        f"Текущий глобальный режим для всех чатов: `[{MODES[CURRENT_GLOBAL_MODE]['title']}]`",
         "",
         "**Смена режима:**",
         "- `/mode <ключ>`",
@@ -226,27 +209,30 @@ def extract_mode_key(text: str) -> str | None:
 
 
 @dp.message(Command("start", "help"), F.chat.type == "private")
-async def cmd_start(message: types.Message, bot: Bot) -> None:
-    current_mode = await get_owner_mode(dp, bot, message.from_user.id)
-    await message.answer(mode_help_text(current_mode), parse_mode="Markdown")
+async def cmd_start(message: types.Message) -> None:
+    if message.from_user.id != OWNER_ID:
+        return
+    await message.answer(mode_help_text(), parse_mode="Markdown")
 
 
 @dp.message(F.text.startswith("/mode"), F.chat.type == "private")
-async def cmd_mode(message: types.Message, bot: Bot) -> None:
+async def cmd_mode(message: types.Message) -> None:
+    if message.from_user.id != OWNER_ID:
+        return
+
+    global CURRENT_GLOBAL_MODE
     requested = extract_mode_key(message.text)
-    owner_id = message.from_user.id
 
     if not requested:
-        current_mode = await get_owner_mode(dp, bot, owner_id)
-        await message.answer(mode_help_text(current_mode), parse_mode="Markdown")
+        await message.answer(mode_help_text(), parse_mode="Markdown")
         return
 
     if requested not in MODES:
         await message.answer("Неизвестный режим. Используй /help.")
         return
 
-    await set_owner_mode(dp, bot, owner_id, requested)
-    await message.answer(f"🔥 Режим успешно изменен на: **{MODES[requested]['title']}**", parse_mode="Markdown")
+    CURRENT_GLOBAL_MODE = requested
+    await message.answer(f"🔥 Режим успешно изменен для всех чатов на: **{MODES[requested]['title']}**", parse_mode="Markdown")
 
 
 # РАБОТА В ГРУППАХ ПРИ УПОМИНАНИИ БОТА
@@ -256,11 +242,10 @@ async def handle_group_mention(message: types.Message, bot: Bot) -> None:
     if f"@{bot_user.username}" not in message.text:
         return
 
-    owner_id = 8781645129  # Твой Telegram ID аккаунта
-
-    chat_state = get_chat_state(dp, bot, owner_id, message.chat.id)
-    chat_data = await chat_state.get_data()
-    history = chat_data.get("chat_history", [])
+    chat_id = message.chat.id
+    if chat_id not in CHATS_HISTORY_CACHE:
+        CHATS_HISTORY_CACHE[chat_id] = []
+    history = CHATS_HISTORY_CACHE[chat_id]
 
     clean_text = message.text.replace(f"@{bot_user.username}", "").strip()
     if not clean_text:
@@ -269,11 +254,10 @@ async def handle_group_mention(message: types.Message, bot: Bot) -> None:
     sender_name = message.from_user.full_name if message.from_user else "Собеседник"
     history.append(f"{sender_name}: {clean_text}")
 
-    mode_key = await get_owner_mode(dp, bot, owner_id)
-    mode = MODES[mode_key]
+    mode = MODES[CURRENT_GLOBAL_MODE]
 
     try:
-        await bot.send_chat_action(chat_id=message.chat.id, action=ChatAction.TYPING)
+        await bot.send_chat_action(chat_id=chat_id, action=ChatAction.TYPING)
     except TelegramAPIError:
         pass
 
@@ -283,7 +267,7 @@ async def handle_group_mention(message: types.Message, bot: Bot) -> None:
         return
 
     history.append(f"Я: {ai_reply}")
-    await chat_state.update_data(chat_history=history[-6:])
+    CHATS_HISTORY_CACHE[chat_id] = history[-6:]
 
     try:
         await message.reply(text=ai_reply)
@@ -296,30 +280,28 @@ async def handle_group_mention(message: types.Message, bot: Bot) -> None:
 async def handle_business_message(message: types.Message, bot: Bot) -> None:
     if not message.business_connection_id:
         return
-        
-    owner_id = 8781645129  # Твой Telegram ID аккаунта
 
     if message.sender_business_bot is not None:
         return
 
-    chat_state = get_chat_state(dp, bot, owner_id, message.chat.id)
-    chat_data = await chat_state.get_data()
-    history = chat_data.get("chat_history", [])
+    chat_id = message.chat.id
+    if chat_id not in CHATS_HISTORY_CACHE:
+        CHATS_HISTORY_CACHE[chat_id] = []
+    history = CHATS_HISTORY_CACHE[chat_id]
 
-    if message.from_user and message.from_user.id == owner_id:
+    if message.from_user and message.from_user.id == OWNER_ID:
         history.append(f"Я: {message.text}")
-        await chat_state.update_data(chat_history=history[-6:])
+        CHATS_HISTORY_CACHE[chat_id] = history[-6:]
         return
 
     if message.text.startswith("/"):
         return
 
     history.append(f"Собеседник: {message.text}")
-    mode_key = await get_owner_mode(dp, bot, owner_id)
-    mode = MODES[mode_key]
+    mode = MODES[CURRENT_GLOBAL_MODE]
 
     try:
-        await bot.send_chat_action(chat_id=message.chat.id, action=ChatAction.TYPING)
+        await bot.send_chat_action(chat_id=chat_id, action=ChatAction.TYPING)
     except TelegramAPIError:
         pass
 
@@ -329,7 +311,7 @@ async def handle_business_message(message: types.Message, bot: Bot) -> None:
         return
 
     history.append(f"Я: {ai_reply}")
-    await chat_state.update_data(chat_history=history[-6:])
+    CHATS_HISTORY_CACHE[chat_id] = history[-6:]
 
     try:
         await message.answer(text=ai_reply)
@@ -339,7 +321,6 @@ async def handle_business_message(message: types.Message, bot: Bot) -> None:
 
 # АВТОПИНГ ДЛЯ БЕСПЛАТНОГО ТАРИФА RENDER
 async def keep_alive():
-    """Каждые 10 минут шлем GET запрос сами себе, чтобы сервер не засыпал"""
     await asyncio.sleep(30)
     async with aiohttp.ClientSession() as session:
         while True:
@@ -359,11 +340,9 @@ async def web_handle(request):
 
 
 async def main() -> None:
-    # Запускаем поллинг aiogram и задачу самопинга в фоне
     asyncio.create_task(dp.start_polling(bot))
     asyncio.create_task(keep_alive())
 
-    # Настраиваем минимальный веб-сервер для Render
     app = web.Application()
     app.router.add_get("/", web_handle)
     
