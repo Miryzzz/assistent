@@ -1,7 +1,7 @@
 ﻿import asyncio
 import logging
 import os
-import random  # Добавили для легкого рандома в задержках
+import random
 from typing import Any
 
 import aiohttp
@@ -36,8 +36,10 @@ dp = Dispatcher()
 
 OWNER_ID = 8781645129  # Твой Telegram ID аккаунта
 
+# Глобальная переменная для хранения текущего режима
 CURRENT_GLOBAL_MODE = "soft"
 
+# Набор боевых режимов
 MODES: dict[str, dict[str, str]] = {
     "soft": {
         "title": "обычный (добрый)",
@@ -63,7 +65,7 @@ MODES: dict[str, dict[str, str]] = {
     "strict": {
         "title": "жёстко",
         "prompt": (
-            "СТИЛЬ ОБЩЕНИЯ: Максимально сухой, твердый, эмоционально холодный и отстраненный. "
+            "СТИЛЬ ОБЩЕНИЯ: Максимально сухой, твердый, emotional холодный и отстраненный. "
             "Полное отсутствие эмоций, вежливости и смайлов. Оперируй только голыми фактами. "
             "Закрывай любые глупые дискуссии одной-двумя вескими фразами.\n"
             "ПРАВИЛА ФОРМАТИРОВАНИЯ: Текст должен быть коротким, обрубленным, без лишних слов."
@@ -73,7 +75,7 @@ MODES: dict[str, dict[str, str]] = {
         "title": "официально",
         "prompt": (
             "СТИЛЬ ОБЩЕНИЯ: Ледяной деловой язык, безупречная и строгая грамотность. "
-            "Никакого сленга. Твои интересы — в приоритете, отстаивай их аргументированно, "
+            "Никого сленга. Твои интересы — в приоритете, отстаивай их аргументированно, "
             "четко и строго по делу. Спокойное интеллектуальное превосходство.\n"
             "ПРАВИЛА ФОРМАТИРОВАНИЯ: Пиши строго с заглавных букв, соблюдай все правила пунктуации, ставь точки."
         ),
@@ -106,7 +108,7 @@ MODES: dict[str, dict[str, str]] = {
     "rough": {
         "title": "грубо",
         "prompt": (
-            "СТИЛЬ ОБЩЕНИЯ: Дерзкий, aggressive, прямолинейный наезд. Если в твой адрес идет малейшая попытка контроля "
+            "СТИЛЬ ОБЩЕНИЯ: Дерзкий, агрессивный, прямолинейный наезд. Если в твой адрес идет малейшая попытка контроля "
             "или критики — мгновенно бей в ответ. Осаживай собеседника, используй жесткие, подавляющие психологические приемы.\n"
             "ПРАВИЛА ФОРМАТИРОВАНИЯ: Короткие, бьющие фразы. Без точек."
         ),
@@ -213,16 +215,13 @@ def extract_mode_key(text: str) -> str | None:
     return None
 
 
-# Функция для красивой имитации набора текста человеком
+# Имитация набора текста человеком
 async def simulate_typing_delay(chat_id: int, bot_obj: Bot, text_length: int) -> None:
-    # Базовая задержка: 1 секунда на каждые 15 символов + случайный хвостик
     delay = (text_length / 15) + random.uniform(1.0, 2.5)
-    # Ограничиваем разумными рамками (минимум 2 секунды, максимум 7 секунд)
     delay = max(2.0, min(delay, 7.0))
     
     logger.info("Simulating typing delay for %s seconds in chat %s", round(delay, 2), chat_id)
     
-    # Пока идет задержка, каждые 4.5 секунды продлеваем статус "typing" (ТГ сбрасывает его через 5 сек)
     spent = 0.0
     while spent < delay:
         try:
@@ -292,7 +291,6 @@ async def handle_group_mention(message: types.Message, bot: Bot) -> None:
     if not ai_reply:
         return
 
-    # Запускаем реалистичную паузу перед ответом
     await simulate_typing_delay(chat_id, bot, len(ai_reply))
 
     history.append(f"Я: {ai_reply}")
@@ -318,9 +316,10 @@ async def handle_business_message(message: types.Message, bot: Bot) -> None:
         CHATS_HISTORY_CACHE[chat_id] = []
     history = CHATS_HISTORY_CACHE[chat_id]
 
-    is_from_me = (message.from_user and message.from_user.id == OWNER_ID) or (message.chat.id == OWNER_ID)
-    
-    if is_from_me:
+    user_id = message.from_user.id if message.from_user else None
+
+    # Жесткий скип: твои собственные сообщения уходят только в историю контекста
+    if message.from_user and message.from_user.id == OWNER_ID:
         history.append(f"Я: {message.text}")
         CHATS_HISTORY_CACHE[chat_id] = history[-6:]
         return
@@ -344,7 +343,6 @@ async def handle_business_message(message: types.Message, bot: Bot) -> None:
     if not ai_reply:
         return
 
-    # Запускаем реалистичную паузу перед ответом
     await simulate_typing_delay(chat_id, bot, len(ai_reply))
 
     history.append(f"Я: {ai_reply}")
