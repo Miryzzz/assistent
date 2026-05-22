@@ -1,6 +1,7 @@
 ﻿import asyncio
 import logging
 import os
+import random  # Добавили для легкого рандома в задержках
 from typing import Any
 
 import aiohttp
@@ -35,10 +36,8 @@ dp = Dispatcher()
 
 OWNER_ID = 8781645129  # Твой Telegram ID аккаунта
 
-# Глобальная переменная для хранения текущего режима, чтобы он гарантированно работал во всех чатах
 CURRENT_GLOBAL_MODE = "soft"
 
-# Обновленные и четко разграниченные режимы
 MODES: dict[str, dict[str, str]] = {
     "soft": {
         "title": "обычный (добрый)",
@@ -107,7 +106,7 @@ MODES: dict[str, dict[str, str]] = {
     "rough": {
         "title": "грубо",
         "prompt": (
-            "СТИЛЬ ОБЩЕНИЯ: Дерзкий, агрессивный, прямолинейный наезд. Если в твой адрес идет малейшая попытка контроля "
+            "СТИЛЬ ОБЩЕНИЯ: Дерзкий, aggressive, прямолинейный наезд. Если в твой адрес идет малейшая попытка контроля "
             "или критики — мгновенно бей в ответ. Осаживай собеседника, используй жесткие, подавляющие психологические приемы.\n"
             "ПРАВИЛА ФОРМАТИРОВАНИЯ: Короткие, бьющие фразы. Без точек."
         ),
@@ -125,7 +124,7 @@ MODES: dict[str, dict[str, str]] = {
             "ПРАВИЛА ФОРМАТИРОВАНИЯ: Короткие, бьющие, как пощечина, фразы. Не ставь точки в конце коротких предложений. "
             "Пиши без звездочек и цензуры."
         ),
-    },
+    }
 }
 
 SYSTEM_CORE = (
@@ -137,7 +136,6 @@ SYSTEM_CORE = (
     "Выдавай ТОЛЬКО готовый текст ответа, без кавычек и без лишних пояснений от себя."
 )
 
-# Хранилище истории контекста для каждого отдельного чата в оперативной памяти
 CHATS_HISTORY_CACHE: dict[int, list[str]] = {}
 
 
@@ -215,6 +213,27 @@ def extract_mode_key(text: str) -> str | None:
     return None
 
 
+# Функция для красивой имитации набора текста человеком
+async def simulate_typing_delay(chat_id: int, bot_obj: Bot, text_length: int) -> None:
+    # Базовая задержка: 1 секунда на каждые 15 символов + случайный хвостик
+    delay = (text_length / 15) + random.uniform(1.0, 2.5)
+    # Ограничиваем разумными рамками (минимум 2 секунды, максимум 7 секунд)
+    delay = max(2.0, min(delay, 7.0))
+    
+    logger.info("Simulating typing delay for %s seconds in chat %s", round(delay, 2), chat_id)
+    
+    # Пока идет задержка, каждые 4.5 секунды продлеваем статус "typing" (ТГ сбрасывает его через 5 сек)
+    spent = 0.0
+    while spent < delay:
+        try:
+            await bot_obj.send_chat_action(chat_id=chat_id, action=ChatAction.TYPING)
+        except TelegramAPIError:
+            pass
+        step = min(4.5, delay - spent)
+        await asyncio.sleep(step)
+        spent += step
+
+
 @dp.message(Command("start", "help"), F.chat.type == "private")
 async def cmd_start(message: types.Message) -> None:
     if message.from_user.id != OWNER_ID:
@@ -273,6 +292,9 @@ async def handle_group_mention(message: types.Message, bot: Bot) -> None:
     if not ai_reply:
         return
 
+    # Запускаем реалистичную паузу перед ответом
+    await simulate_typing_delay(chat_id, bot, len(ai_reply))
+
     history.append(f"Я: {ai_reply}")
     CHATS_HISTORY_CACHE[chat_id] = history[-6:]
 
@@ -296,19 +318,13 @@ async def handle_business_message(message: types.Message, bot: Bot) -> None:
         CHATS_HISTORY_CACHE[chat_id] = []
     history = CHATS_HISTORY_CACHE[chat_id]
 
-    # ЖЕЛЕЗНАЯ ПРОВЕРКА: Если ID отправителя совпадает с твоим OWNER_ID,
-    # или если это исходящее сообщение от твоего имени в этом бизнес-чате
-    # (в aiogram бизнес-сообщения от самого себя могут прилетать без корректного from_user.id, проверяем оба варианта)
     is_from_me = (message.from_user and message.from_user.id == OWNER_ID) or (message.chat.id == OWNER_ID)
     
-    # Также проверяем, не является ли это твоим собственным ответом внутри чужого диалога
-    # Если сообщение помечено как исходящее от владельца аккаунта
     if is_from_me:
         history.append(f"Я: {message.text}")
         CHATS_HISTORY_CACHE[chat_id] = history[-6:]
         return
 
-    # Дополнительный предохранитель: если ты общаешься с ботом в его ЛИЧНЫХ сообщениях (как админ)
     if message.chat.type == "private" and message.from_user.id == OWNER_ID and message.text.startswith("/"):
         return
 
@@ -327,6 +343,9 @@ async def handle_business_message(message: types.Message, bot: Bot) -> None:
     ai_reply = await fetch_deepseek(mode["prompt"], history_context)
     if not ai_reply:
         return
+
+    # Запускаем реалистичную паузу перед ответом
+    await simulate_typing_delay(chat_id, bot, len(ai_reply))
 
     history.append(f"Я: {ai_reply}")
     CHATS_HISTORY_CACHE[chat_id] = history[-6:]
