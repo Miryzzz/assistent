@@ -296,9 +296,20 @@ async def handle_business_message(message: types.Message, bot: Bot) -> None:
         CHATS_HISTORY_CACHE[chat_id] = []
     history = CHATS_HISTORY_CACHE[chat_id]
 
-    if message.from_user and message.from_user.id == OWNER_ID:
+    # ЖЕЛЕЗНАЯ ПРОВЕРКА: Если ID отправителя совпадает с твоим OWNER_ID,
+    # или если это исходящее сообщение от твоего имени в этом бизнес-чате
+    # (в aiogram бизнес-сообщения от самого себя могут прилетать без корректного from_user.id, проверяем оба варианта)
+    is_from_me = (message.from_user and message.from_user.id == OWNER_ID) or (message.chat.id == OWNER_ID)
+    
+    # Также проверяем, не является ли это твоим собственным ответом внутри чужого диалога
+    # Если сообщение помечено как исходящее от владельца аккаунта
+    if is_from_me:
         history.append(f"Я: {message.text}")
         CHATS_HISTORY_CACHE[chat_id] = history[-6:]
+        return
+
+    # Дополнительный предохранитель: если ты общаешься с ботом в его ЛИЧНЫХ сообщениях (как админ)
+    if message.chat.type == "private" and message.from_user.id == OWNER_ID and message.text.startswith("/"):
         return
 
     if message.text.startswith("/"):
