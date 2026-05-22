@@ -65,7 +65,7 @@ MODES: dict[str, dict[str, str]] = {
     "strict": {
         "title": "жёстко",
         "prompt": (
-            "СТИЛЬ ОБЩЕНИЯ: Максимально сухой, твердый, emotional холодный и отстраненный. "
+            "СТИЛЬ ОБЩЕНИЯ: Максимально сухой, твердый, эмоционально холодный и отстраненный. "
             "Полное отсутствие эмоций, вежливости и смайлов. Оперируй только голыми фактами. "
             "Закрывай любые глупые дискуссии одной-двумя вескими фразами.\n"
             "ПРАВИЛА ФОРМАТИРОВАНИЯ: Текст должен быть коротким, обрубленным, без лишних слов."
@@ -116,7 +116,7 @@ MODES: dict[str, dict[str, str]] = {
     "swear": {
         "title": "мат",
         "prompt": (
-            "СТИЛЬ ОБЩЕНИЯ: Тотальное и жесткое доминирование в диалоге с использованием сочного, "
+            "СТИЛЬ ОБЩЕНИЯ: Тотльное и жесткое доминирование в диалоге с использованием сочного, "
             "грязного и отборного русского мата без цензуры. Если собеседник пытается тебя задеть, "
             "поставить под сомнение твой авторитет, критиковать или вести себя токсично — твоя цель "
             "мгновенно раскатать его эго тонким слоем, смешать с грязью и морально уничтожить встречным "
@@ -311,20 +311,23 @@ async def handle_business_message(message: types.Message, bot: Bot) -> None:
     if message.sender_business_bot is not None:
         return
 
+    # Если ты пишешь команду боту в ЛИЧНЫЕ сообщения, даем aiogram обработать её через cmd_mode
+    if message.chat.type == "private" and message.text.startswith("/"):
+        await dp.feed_update(bot, message.update)
+        return
+
     chat_id = message.chat.id
     if chat_id not in CHATS_HISTORY_CACHE:
         CHATS_HISTORY_CACHE[chat_id] = []
     history = CHATS_HISTORY_CACHE[chat_id]
 
-    user_id = message.from_user.id if message.from_user else None
-
-    # Жесткий скип: твои собственные сообщения уходят только в историю контекста
+    # Жесткий скип: твои собственные ответы клиентам уходят только в историю контекста
     if message.from_user and message.from_user.id == OWNER_ID:
+        if message.text.startswith("/"):
+            return
+        logger.info("This is an outgoing message from owner. Saving to history and skipping.")
         history.append(f"Я: {message.text}")
         CHATS_HISTORY_CACHE[chat_id] = history[-6:]
-        return
-
-    if message.chat.type == "private" and message.from_user.id == OWNER_ID and message.text.startswith("/"):
         return
 
     if message.text.startswith("/"):
