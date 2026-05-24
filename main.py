@@ -39,7 +39,7 @@ dp = Dispatcher()
 OWNER_ID = 8781645129  # Твой Telegram ID
 CURRENT_GLOBAL_MODE = "soft"
 
-RANDOM_REACTIONS = ["🔥", "🤡", "🗿", "😂", "💀", "👍", "👀"]
+RANDOM_REACTIONS = ["🗿", "🤡", "💀", "👍"]
 
 # 📸 Локальная база мемов (папка 'memes' в корне проекта)
 MEMES_DATABASE = {
@@ -63,58 +63,60 @@ MEDIA_INSTRUCTION = (
     f"\n\nПРАВИЛО МЕДИА-ТЕГОВ: Если ситуация ИДЕАЛЬНО подходит под мем или гифку, ты можешь отправить тег вместо текста. "
     f"Для мема пиши строго: [send_meme:название_мема]. Доступны: {', '.join(MEMES_DATABASE.keys())}.\n"
     f"Для гифки пиши строго: [send_gif:название_гифки]. Доступны: {', '.join(GIFS_DATABASE.keys())}.\n"
-    f"Используй теги редко (шанс 10-15%), только когда это реально в тему."
+    f"Используй теги редко (шанс 5-10%), только когда это реально в тему диалога."
 )
 
 MODES: dict[str, dict[str, str]] = {
     "soft": {
         "title": "обычный пацанский",
         "prompt": (
-            "СТИЛЬ ОБЩЕНИЯ: Ты общаешься в своем привычном пацанском чате. Никакого пафоса, никакой вежливости. "
-            "Речь простая, живая, ленивая. Используй обычный мат (бля, нахуй, сука, ебать) для связки слов, но естественно, как в жизни. "
-            "Отвечай коротко, емко. Избегай банальных ИИ-фразочек. Если смешно — пиши капсом (АХАХАХА, ААЪАЪАЪА).\n"
-            "ЖЕСТКИЕ ТРЕБОВАНИЯ К ФОРМАТУ:\n"
-            "1. Пиши исключительно маленькими буквами (без заглавных).\n"
-            "2. КАПС разрешен только для сильных эмоций, мата или дикого смеха.\n"
-            "3. Никогда не ставь точку в конце сообщения.\n"
-            "4. Никаких смайликов (😀, 😉), только текстовые скобки (если надо) или нативные эмодзи типа 🤡, 💀, 🗿."
+            "СТИЛЬ ОБЩЕНИЯ: Спокойный, ленивый и простой пацанский диалог без лишних слов. "
+            "Ты общаешься со знакомыми кентами, тебе 19 лет. Речь простая, жизненная, местами похуистическая. "
+            "Используй обычный мат (бля, нахуй, сука, ебать) исключительно как связку слов, без дикой агрессии и без криков. "
+            "Пиши коротко, как обычные люди в чатах. Не пытайся шутить каждую секунду. "
+            "Если реально смешно — пиши капсом (АХАХАХА).\n"
+            "ЖЕСТКИЕ ПРАВИЛА ФОРМАТА:\n"
+            "1. Пиши только маленькими буквами.\n"
+            "2. Никаких точек на конце фраз.\n"
+            "3. Полный, строжайший запрет на любые смайлики, эмодзи или иконки. Вообще никаких."
         ) + MEDIA_INSTRUCTION,
     },
     "flirt": {
         "title": "подкат",
         "prompt": (
-            "СТИЛЬ ОБЩЕНИЯ: Уверенный, немного наглый, ироничный подкат. Без ванильных соплей. "
-            "Легкий стеб, пацанская харизма. Короткие фразы, маленькие буквы, без точек."
+            "СТИЛЬ ОБЩЕНИЯ: Уверенный, спокойный, слегка ироничный подкат без соплей. "
+            "Легкий стеб, пацанская харизма, короткие фразы маленькими буквами без точек и смайлов."
         ) + MEDIA_INSTRUCTION,
     },
     "troll": {
         "title": "постирония/троллинг",
         "prompt": (
-            "СТИЛЬ ОБЩЕНИЯ: Плотный, жесткий стеб. Выставляй собеседника клоуном, души его аргументами, "
-            "высмеивай душноту. Используй капс на ключевых оскорблениях или когда угараешь с чужой тупости."
+            "СТИЛЬ ОБЩЕНИЯ: Тонкий пацанский стеб. Лови людей на абсурде, отвечай лениво и иронично. "
+            "Показывай, что тебе похуй. Без лишней душноты, коротко."
         ) + MEDIA_INSTRUCTION,
     },
     "rough": {
         "title": "жесткий отпор",
         "prompt": (
-            "СТИЛЬ ОБЩЕНИЯ: Резкий, агрессивны осадок на любой наезд. Моментально посылай нахуй, "
-            "врубай агрессию. Пиши хлестко, коротко, без лишних соплей."
+            "СТИЛЬ ОБЩЕНИЯ: Холодный, ленивый и токсичный отпор. Тебя тяжело задеть, ты отвечаешь спокойно, "
+            "но емко и обидно. Посылай нахуй без лишней истерики и без спама капсом. Коротко осаживай."
         ) + MEDIA_INSTRUCTION,
     },
     "swear": {
         "title": "фулл мат/уничтожение",
         "prompt": (
-            "СТИЛЬ ОБЩЕНИЯ: Максимально жесткий, грязный разговорный мат без тормозов. "
-            "Смешивай оппонента с грязью, используй жесткие пацанские оскорбления. Капс приветствуется."
+            "СТИЛЬ ОБЩЕНИЯ: Ленивое, грубое пацанское посылание нахуй. Смешивай с грязью аргументы оппонента, "
+            "используй жесткий мат, но не пиши длинные тирады. Текста должно быть мало. Отвечай хлестко."
         ) + MEDIA_INSTRUCTION,
     }
 }
 
 SYSTEM_CORE = (
-    "Текущий год: 2026. Ты — обычный 19-летний парень, сидишь в Телеге со своего аккаунта, играешь в игры (дота, майн, кс), "
-    "зависаешь с кентами. Ты ЖИВОЙ ЧЕЛОВЕК, а не бот или ИИ. "
-    "Если говорят, что ты бот — жестко шли нахуй, угарай с этого, агрессивно или иронично отрицай. "
-    "Выдавай ТОЛЬКО готовый текст ответа или медиа-тег, без кавычек, пояснений и лишнего ИИ-мусора."
+    "Текущий год: 2026. Ты — обычный 19-летний парень, сидишь в Телеге со своего аккаунта, играешь в доту, майн, кс, "
+    "общаешься с кентами. Ты ЖИВОЙ ЧЕЛОВЕК, а не бот. Не пиши как робот, не строй длинных предложений. "
+    "Если говорят, что ты бот — иронично шли нахуй, отрицай. "
+    "Выдавай ТОЛЬКО готовый текст ответа или медиа-тег, без кавычек и лишних пояснений. "
+    "Полный запрет на использование любых смайликов и эмодзи."
 )
 
 CHATS_HISTORY_CACHE: dict[int, list[str]] = {}
@@ -137,12 +139,12 @@ async def fetch_deepseek(style_prompt: str, history_context: str) -> str | None:
                     f"НАСТРОЙКА ТВОЕГО ПОВЕДЕНИЯ СЕЙЧАС:\n{style_prompt}\n\n"
                     f"КОНТЕКСТ ПОСЛЕДНИХ СООБЩЕНИЙ ИЗ ЧАТА (Я — это твой аккаунт):\n"
                     f"{history_context}\n\n"
-                    f"ЗАДАНИЕ: Напиши идеальный ответ на последнюю реплику. Отвечай как живой пацан из чата."
+                    f"ЗАДАНИЕ: Напиши идеальный короткий ответ на последнюю реплику."
                 ),
             },
         ],
-        "temperature": 0.85,
-        "max_tokens": 200,
+        "temperature": 0.65,  # Снижено, чтобы бот не сходил с ума и не спамил
+        "max_tokens": 150,
         "stream": False,
     }
 
@@ -185,7 +187,7 @@ async def send_smart_reply(message: types.Message, ai_reply: str, is_business: b
                     logger.info(f"🔥 Успешно отправлен локальный мем: {file_path}")
                 else:
                     logger.warning(f"Мем {file_path} не найден на сервере!")
-                    await message.answer(text=f"бля должен был быть мем про {key} но я забыл его скачать на сервер")
+                    await message.answer(text="бля должен был быть мем но я забыл его на сервер кинуть")
                 return
         
         # ОТПРАВКА ГИФОК ИЗ ПАПКИ
@@ -203,27 +205,47 @@ async def send_smart_reply(message: types.Message, ai_reply: str, is_business: b
                     logger.info(f"🔥 Успешно отправлена локальная гифка: {file_path}")
                 else:
                     logger.warning(f"Гифка {file_path} не найдена на сервере!")
-                    await message.answer(text=f"хотел гифку кинуть {key} но ее нет")
+                    await message.answer(text="хотел гифку кинуть но забыл скачать")
                 return
 
-        # Обычный пацанский текстовый ответ (капс сохраняем, точки убираем)
-        final_text = ai_reply.strip()
-        if not final_text.isupper():
-            final_text = final_text.lower()
-        if final_text.endswith("."):
-            final_text = final_text[:-1].strip()
+        # --- ЖЕСТКАЯ ФИЛЬТРАЦИЯ ОТ ЛЮБЫХ СМАЙЛИКОВ И ЭМОДЗИ ---
+        clean_text = ai_reply.strip()
+        
+        # Полное регулярное выражение для удаления вообще всех юникод-эмодзи и спецсимволов графики
+        emoji_pattern = re.compile(
+            "["
+            "\U00010000-\U0010ffff"  # Основной блок эмодзи
+            "\u2600-\u27bf"          # Символы, стрелочки, значки
+            "\u2300-\u23ff"          # Технические знаки
+            "\u2b50"                 # Звезда и прочие одиночные символы
+            "]+", 
+            flags=re.UNICODE
+        )
+        clean_text = emoji_pattern.sub(r"", clean_text)
+
+        # Обработка регистра (капс для смеха/криков оставляем, остальное в нижний)
+        if not clean_text.isupper():
+            clean_text = clean_text.lower()
+            
+        # Срезаем точки на конце фразы
+        if clean_text.endswith("."):
+            clean_text = clean_text[:-1].strip()
+
+        # Если после чистки осталась пустота
+        if not clean_text.strip():
+            clean_text = "че"
 
         if is_business:
-            await message.answer(text=final_text)
+            await message.answer(text=clean_text)
         else:
-            await message.reply(text=final_text)
+            await message.reply(text=clean_text)
 
     except Exception as exc:
         logger.exception("Глобальный сбой в функции send_smart_reply: %s", exc)
 
 
 async def simulate_typing_delay(chat_id: int, bot_obj: Bot, text_length: int) -> None:
-    delay = max(1.0, min((text_length / 25) + random.uniform(0.5, 1.5), 4.5))
+    delay = max(1.0, min((text_length / 25) + random.uniform(0.4, 1.2), 4.0))
     await asyncio.sleep(delay)
 
 
@@ -252,13 +274,13 @@ async def handle_group_mention(message: types.Message, bot: Bot) -> None:
     else:
         history.append(f"{sender_name}: {clean_text}")
         
-    CHATS_HISTORY_CACHE[chat_id] = history[-20:]
+    CHATS_HISTORY_CACHE[chat_id] = history[-25:]
 
     if not (is_mentioned or is_reply_to_bot) or (message.from_user and message.from_user.id == bot_user.id):
         return
 
-    # Шанс 10% просто поставить быструю реакцию
-    if random.random() < 0.10:
+    # Шанс 8% просто поставить быструю пацанскую реакцию на сообщение
+    if random.random() < 0.08:
         try:
             await message.react([types.ReactionTypeEmoji(emoji=random.choice(RANDOM_REACTIONS))])
             return
@@ -296,7 +318,7 @@ async def handle_business_message(message: types.Message, bot: Bot) -> None:
     if message.from_user and message.from_user.id == OWNER_ID:
         if message.text.startswith("/"): return
         history.append(f"Я: {message.text}")
-        CHATS_HISTORY_CACHE[chat_id] = history[-20:]
+        CHATS_HISTORY_CACHE[chat_id] = history[-25:]
         return
 
     if message.text.startswith("/"): return
@@ -316,7 +338,7 @@ async def handle_business_message(message: types.Message, bot: Bot) -> None:
 
     await simulate_typing_delay(chat_id, bot, len(ai_reply))
     history.append(f"Я: {ai_reply}")
-    CHATS_HISTORY_CACHE[chat_id] = history[-20:]
+    CHATS_HISTORY_CACHE[chat_id] = history[-25:]
 
     await send_smart_reply(message, ai_reply, is_business=True)
 
@@ -324,7 +346,7 @@ async def handle_business_message(message: types.Message, bot: Bot) -> None:
 # Панель управления
 def mode_help_text() -> str:
     lines = [
-        "⚔️ **Бизнес-бот перенастроен под чат.**",
+        "⚔️ **Бизнес-бот стабилизирован.**",
         f"Текущий режим: `[{MODES[CURRENT_GLOBAL_MODE]['title']}]`",
         "",
         "**Смена режима:**",
@@ -362,7 +384,8 @@ async def cmd_mode(message: types.Message) -> None:
     CURRENT_GLOBAL_MODE = requested
     await message.answer(f"🔥 Врублен режим: **{MODES[requested]['title']}**", parse_mode="Markdown")
 
-# Фоновые пинги Render
+
+# Фоновые процессы Render
 async def keep_alive():
     await asyncio.sleep(30)
     async with aiohttp.ClientSession() as session:
