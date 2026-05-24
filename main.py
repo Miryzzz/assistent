@@ -11,6 +11,7 @@ from aiogram import Bot, Dispatcher, F, types
 from aiogram.enums import ChatAction
 from aiogram.exceptions import TelegramAPIError
 from aiogram.filters import Command
+from aiogram.types import FSInputFile
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -35,87 +36,85 @@ logger = logging.getLogger("business-bot")
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
-OWNER_ID = 8781645129  # Твой Telegram ID аккаунта
+OWNER_ID = 8781645129  # Твой Telegram ID
 CURRENT_GLOBAL_MODE = "soft"
 
 RANDOM_REACTIONS = ["🔥", "🤡", "🗿", "😂", "💀", "👍", "👀"]
 
-# 📸 База мемов (Ссылки из ТГ-каналов работают надежнее всего)
+# 📸 Локальная база мемов (папка 'memes' в корне проекта)
 MEMES_DATABASE = {
-    "сигма": "https://t.me/baza_memov_bot_storage/2",
-    "фейспалм": "https://t.me/baza_memov_bot_storage/3",
-    "пон": "https://t.me/baza_memov_bot_storage/4",
-    "клоун": "https://t.me/baza_memov_bot_storage/5",
-    "кринж": "https://t.me/baza_memov_bot_storage/6",
-    "база": "https://t.me/baza_memov_bot_storage/7"
+    "сигма": "memes/sigma.jpg",
+    "фейспалм": "memes/facepalm.jpg",
+    "пон": "memes/pon.jpg",
+    "клоун": "memes/clown.jpg",
+    "кринж": "memes/cringe.jpg",
+    "база": "memes/baza.jpg"
 }
 
 # 🎬 База GIF
 GIFS_DATABASE = {
-    "чилл": "https://media.giphy.com/media/l41YvpiA9uMWw5AMU/giphy.gif",
-    "фейл": "https://media.giphy.com/media/3LOXv99X7V6Q8/giphy.gif",
-    "инсульт": "https://media.giphy.com/media/l3q2K1M6w1tAJA8iA/giphy.gif",
-    "шок": "https://media.giphy.com/media/11ykUODWZvfHMc/giphy.gif"
+    "чилл": "memes/chill.gif",
+    "фейл": "memes/fail.gif",
+    "инсульт": "memes/insult.gif",
+    "шок": "memes/shock.gif"
 }
 
 MEDIA_INSTRUCTION = (
-    f"\n\nУ тебя есть суперсила — ты можешь отправлять в чат мемы или GIF, если они идеально подходят под рофл или ситуацию. "
-    f"Если хочешь отправить МЕМ, напиши строго в теле ответа (без другого текста): [send_meme:название_мема]. "
-    f"Доступные мемы: {', '.join(MEMES_DATABASE.keys())}.\n"
-    f"Если хочешь отправить ГИФКУ, напиши строго в теле ответа: [send_gif:название_гифки]. "
-    f"Доступные гифки: {', '.join(GIFS_DATABASE.keys())}.\n"
-    f"Применяй медиа-теги редко (с шансом ~15-20%), только когда это реально разрыв контекста. В остальных случаях отвечай текстом."
+    f"\n\nПРАВИЛО МЕДИА-ТЕГОВ: Если ситуация ИДЕАЛЬНО подходит под мем или гифку, ты можешь отправить тег вместо текста. "
+    f"Для мема пиши строго: [send_meme:название_мема]. Доступны: {', '.join(MEMES_DATABASE.keys())}.\n"
+    f"Для гифки пиши строго: [send_gif:название_гифки]. Доступны: {', '.join(GIFS_DATABASE.keys())}.\n"
+    f"Используй теги редко (шанс 10-15%), только когда это реально в тему."
 )
 
 MODES: dict[str, dict[str, str]] = {
     "soft": {
-        "title": "вайбовый (обычный)",
+        "title": "обычный пацанский",
         "prompt": (
-            "СТИЛЬ ОБЩЕНИЯ: Общайся как 19-летний харизматичный парень. Твой стиль — легкий, постироничный, "
-            "абсолютно расслабленный зумерский вайб. Ты общаешься со сверстниками. Используй живой сленг "
-            "(жиза, рил, дефолтный, рофл, чилл, треш, байтить, вайб, форсить) естественно, без кринжа и перебора.\n"
-            "СТРОЖАЙШИЕ ПРАВИЛА ФОРМАТИРОВАНИЯ:\n"
-            "1. Пиши ВСЁ исключительно маленькими буквами (со строчной). Вообще никаких заглавных, даже в именах.\n"
-            "2. В конце фраз НЕ СТАВЬ точки.\n"
-            "3. Полный запрет на смайлики (типа 😀, 😊) и вежливый ИИ-булшит."
+            "СТИЛЬ ОБЩЕНИЯ: Ты общаешься в своем привычном пацанском чате. Никакого пафоса, никакой вежливости. "
+            "Речь простая, живая, ленивая. Используй обычный мат (бля, нахуй, сука, ебать) для связки слов, но естественно, как в жизни. "
+            "Отвечай коротко, емко. Избегай банальных ИИ-фразочек. Если смешно — пиши капсом (АХАХАХА, ААЪАЪАЪА).\n"
+            "ЖЕСТКИЕ ТРЕБОВАНИЯ К ФОРМАТУ:\n"
+            "1. Пиши исключительно маленькими буквами (без заглавных).\n"
+            "2. КАПС разрешен только для сильных эмоций, мата или дикого смеха.\n"
+            "3. Никогда не ставь точку в конце сообщения.\n"
+            "4. Никаких смайликов (😀, 😉), только текстовые скобки (если надо) или нативные эмодзи типа 🤡, 💀, 🗿."
         ) + MEDIA_INSTRUCTION,
     },
     "flirt": {
-        "title": "флирт/подкат",
+        "title": "подкат",
         "prompt": (
-            "СТИЛЬ ОБЩЕНИЯ: Уверенный, слегка наглый, но дико обаятельный флирт 19-летнего парня. "
-            "Никаких ванильных соплей и банальных комплиментов. Тонкий стеб, интрига, легкие подколы. "
-            "Пиши коротко, с маленькой буквы, без точек на конце."
+            "СТИЛЬ ОБЩЕНИЯ: Уверенный, немного наглый, ироничный подкат. Без ванильных соплей. "
+            "Легкий стеб, пацанская харизма. Короткие фразы, маленькие буквы, без точек."
         ) + MEDIA_INSTRUCTION,
     },
     "troll": {
         "title": "постирония/троллинг",
         "prompt": (
-            "СТИЛЬ ОБЩЕНИЯ: Чистая постирония, тонкий ядовитый сарказм зумера. Лови людей на абсурде, "
-            "выставляй их излишнюю серьезность смешной, делай из оппонента клоуна, но сам оставайся «на чилле»."
+            "СТИЛЬ ОБЩЕНИЯ: Плотный, жесткий стеб. Выставляй собеседника клоуном, души его аргументами, "
+            "высмеивай душноту. Используй капс на ключевых оскорблениях или когда угараешь с чужой тупости."
         ) + MEDIA_INSTRUCTION,
     },
     "rough": {
         "title": "жесткий отпор",
         "prompt": (
-            "СТИЛЬ ОБЩЕНИЯ: Резкий, агрессивный, уверенный отпор на любой наезд или душноту. Если тебя пытаются "
-            "задеть или контролировать — моментально осаживай, врубай ментальное доминирование. Без точек, хлестко."
+            "СТИЛЬ ОБЩЕНИЯ: Резкий, агрессивны осадок на любой наезд. Моментально посылай нахуй, "
+            "врубай агрессию. Пиши хлестко, коротко, без лишних соплей."
         ) + MEDIA_INSTRUCTION,
     },
     "swear": {
-        "title": "фулл мат",
+        "title": "фулл мат/уничтожение",
         "prompt": (
-            "СТИЛЬ ОБЩЕНИЯ: Тотальное уничтожение оппонента с использованием грязного, органичного разговорного мата. "
-            "Никаких оправданий, бей фактами, смешивай с грязью их аргументы. Коротко, жестко, без точек и цензуры."
+            "СТИЛЬ ОБЩЕНИЯ: Максимально жесткий, грязный разговорный мат без тормозов. "
+            "Смешивай оппонента с грязью, используй жесткие пацанские оскорбления. Капс приветствуется."
         ) + MEDIA_INSTRUCTION,
     }
 }
 
 SYSTEM_CORE = (
-    "Текущий год: 2026. Ты — живой человек, тебе 19 лет, обычный парень, фронтендер, сидишь в Telegram со своего аккаунта. "
-    "ЖЕСТКОЕ ПРАВИЛО: Ты ни в коем случае не бот, не нейросеть. "
-    "Если тебе пишут 'ты бот' — угарай с этого, агрессивно или иронично отрицай. "
-    "Выдавай ТОЛЬКО готовый текст ответа или медиа-тег, без кавычек и лишних пояснений."
+    "Текущий год: 2026. Ты — обычный 19-летний парень, сидишь в Телеге со своего аккаунта, играешь в игры (дота, майн, кс), "
+    "зависаешь с кентами. Ты ЖИВОЙ ЧЕЛОВЕК, а не бот или ИИ. "
+    "Если говорят, что ты бот — жестко шли нахуй, угарай с этого, агрессивно или иронично отрицай. "
+    "Выдавай ТОЛЬКО готовый текст ответа или медиа-тег, без кавычек, пояснений и лишнего ИИ-мусора."
 )
 
 CHATS_HISTORY_CACHE: dict[int, list[str]] = {}
@@ -135,15 +134,15 @@ async def fetch_deepseek(style_prompt: str, history_context: str) -> str | None:
             {
                 "role": "user",
                 "content": (
-                    f"ТРЕБОВАНИЯ К ТВОЕМУ СТИЛЮ СЕЙЧАС:\n{style_prompt}\n\n"
-                    f"ПОСЛЕДНИЕ СООБЩЕНИЯ В ЧАТЕ ДЛЯ КОНТЕКСТА (Я — это 'Я'):\n"
+                    f"НАСТРОЙКА ТВОЕГО ПОВЕДЕНИЯ СЕЙЧАС:\n{style_prompt}\n\n"
+                    f"КОНТЕКСТ ПОСЛЕДНИХ СООБЩЕНИЙ ИЗ ЧАТА (Я — это твой аккаунт):\n"
                     f"{history_context}\n\n"
-                    f"ЗАДАНИЕ: Напиши идеальный ответ на последнюю реплику. Отвечай как 19-летний парень."
+                    f"ЗАДАНИЕ: Напиши идеальный ответ на последнюю реплику. Отвечай как живой пацан из чата."
                 ),
             },
         ],
-        "temperature": 0.9,
-        "max_tokens": 250,
+        "temperature": 0.85,
+        "max_tokens": 200,
         "stream": False,
     }
 
@@ -166,50 +165,54 @@ async def fetch_deepseek(style_prompt: str, history_context: str) -> str | None:
             return None
 
 
-# 🛠 УМНАЯ И ЗАЩИЩЕННАЯ ОТПРАВКА МЕДИА / ТЕКСТА
 async def send_smart_reply(message: types.Message, ai_reply: str, is_business: bool = False) -> None:
     meme_match = re.search(r"\[send_meme:(.*?)\]", ai_reply)
     gif_match = re.search(r"\[send_gif:(.*?)\]", ai_reply)
 
     try:
+        # ОТПРАВКА МЕМОВ ИЗ ПАПКИ
         if meme_match:
             key = meme_match.group(1).strip().lower()
             if key in MEMES_DATABASE:
-                await message.bot.send_chat_action(chat_id=message.chat.id, action=ChatAction.UPLOAD_PHOTO)
-                try:
+                file_path = MEMES_DATABASE[key]
+                if os.path.exists(file_path):
+                    await message.bot.send_chat_action(chat_id=message.chat.id, action=ChatAction.UPLOAD_PHOTO)
+                    photo_file = FSInputFile(file_path)
                     if is_business:
-                        sent_msg = await message.answer_photo(photo=MEMES_DATABASE[key])
+                        await message.answer_photo(photo=photo_file)
                     else:
-                        sent_msg = await message.reply_photo(photo=MEMES_DATABASE[key])
-                    
-                    if sent_msg.photo:
-                        logger.info(f"🔥 УСПЕХ! file_id для мема '{key}': {sent_msg.photo[-1].file_id}")
-                    return
-                except TelegramAPIError as e:
-                    logger.error(f"Не удалось отправить мем {key} по ссылке: {e}. Переключаемся на текст.")
-                    await message.answer(text=f"должен был быть мем про {key}, но хостинг картинок опять лег")
-                    return
+                        await message.reply_photo(photo=photo_file)
+                    logger.info(f"🔥 Успешно отправлен локальный мем: {file_path}")
+                else:
+                    logger.warning(f"Мем {file_path} не найден на сервере!")
+                    await message.answer(text=f"бля должен был быть мем про {key} но я забыл его скачать на сервер")
+                return
         
+        # ОТПРАВКА ГИФОК ИЗ ПАПКИ
         elif gif_match:
             key = gif_match.group(1).strip().lower()
             if key in GIFS_DATABASE:
-                await message.bot.send_chat_action(chat_id=message.chat.id, action=ChatAction.UPLOAD_DOCUMENT)
-                try:
+                file_path = GIFS_DATABASE[key]
+                if os.path.exists(file_path):
+                    await message.bot.send_chat_action(chat_id=message.chat.id, action=ChatAction.UPLOAD_DOCUMENT)
+                    gif_file = FSInputFile(file_path)
                     if is_business:
-                        sent_msg = await message.answer_animation(animation=GIFS_DATABASE[key])
+                        await message.answer_animation(animation=gif_file)
                     else:
-                        sent_msg = await message.reply_animation(animation=GIFS_DATABASE[key])
-                    
-                    if sent_msg.animation:
-                        logger.info(f"🔥 УСПЕХ! file_id для гифки '{key}': {sent_msg.animation.file_id}")
-                    return
-                except TelegramAPIError as e:
-                    logger.error(f"Не удалось отправить гифку {key} по ссылке: {e}. Переключаемся на текст.")
-                    await message.answer(text=f"тут должна быть гифка {key}, но чето пошло не по плану")
-                    return
+                        await message.reply_animation(animation=gif_file)
+                    logger.info(f"🔥 Успешно отправлена локальная гифка: {file_path}")
+                else:
+                    logger.warning(f"Гифка {file_path} не найдена на сервере!")
+                    await message.answer(text=f"хотел гифку кинуть {key} но ее нет")
+                return
 
-        # Если обычный текст — принудительно переводим в нижний регистр зумер-мода
-        final_text = ai_reply.lower()
+        # Обычный пацанский текстовый ответ (капс сохраняем, точки убираем)
+        final_text = ai_reply.strip()
+        if not final_text.isupper():
+            final_text = final_text.lower()
+        if final_text.endswith("."):
+            final_text = final_text[:-1].strip()
+
         if is_business:
             await message.answer(text=final_text)
         else:
@@ -220,7 +223,7 @@ async def send_smart_reply(message: types.Message, ai_reply: str, is_business: b
 
 
 async def simulate_typing_delay(chat_id: int, bot_obj: Bot, text_length: int) -> None:
-    delay = max(1.5, min((text_length / 18) + random.uniform(0.8, 2.0), 5.5))
+    delay = max(1.0, min((text_length / 25) + random.uniform(0.5, 1.5), 4.5))
     await asyncio.sleep(delay)
 
 
@@ -242,7 +245,7 @@ async def handle_group_mention(message: types.Message, bot: Bot) -> None:
     history = CHATS_HISTORY_CACHE[chat_id]
 
     sender_name = message.from_user.first_name if message.from_user else "кто-то"
-    clean_text = message.text.replace(f"@{bot_user.username}", "").strip() or "а?"
+    clean_text = message.text.replace(f"@{bot_user.username}", "").strip() or "че"
 
     if message.from_user and message.from_user.id == bot_user.id:
         history.append(f"Я: {clean_text}")
@@ -254,8 +257,8 @@ async def handle_group_mention(message: types.Message, bot: Bot) -> None:
     if not (is_mentioned or is_reply_to_bot) or (message.from_user and message.from_user.id == bot_user.id):
         return
 
-    # Шанс 12% просто шлепнуть зумерскую реакцию вместо текста
-    if random.random() < 0.12:
+    # Шанс 10% просто поставить быструю реакцию
+    if random.random() < 0.10:
         try:
             await message.react([types.ReactionTypeEmoji(emoji=random.choice(RANDOM_REACTIONS))])
             return
@@ -279,7 +282,7 @@ async def handle_group_mention(message: types.Message, bot: Bot) -> None:
     await send_smart_reply(message, ai_reply, is_business=False)
 
 
-# БИЗНЕС ХЭНДЛЕР (ЛИЧКА ЧЕРЕЗ TELEGRAM BUSINESS API)
+# БИЗНЕС ХЭНДЛЕР
 @dp.business_message(F.text)
 async def handle_business_message(message: types.Message, bot: Bot) -> None:
     if not message.business_connection_id or message.sender_business_bot is not None:
@@ -318,17 +321,16 @@ async def handle_business_message(message: types.Message, bot: Bot) -> None:
     await send_smart_reply(message, ai_reply, is_business=True)
 
 
-# Управление режимами
+# Панель управления
 def mode_help_text() -> str:
     lines = [
-        "🤖 **Бизнес-бот активен.**",
-        f"Текущий глобальный режим для всех чатов: `[{MODES[CURRENT_GLOBAL_MODE]['title']}]`",
+        "⚔️ **Бизнес-бот перенастроен под чат.**",
+        f"Текущий режим: `[{MODES[CURRENT_GLOBAL_MODE]['title']}]`",
         "",
         "**Смена режима:**",
         "- `/mode <ключ>`",
-        "- `/mode_<ключ>`",
         "",
-        "**Доступные режимы:**",
+        "**Режимы:**",
     ]
     for key, mode in MODES.items():
         lines.append(f"- `{key}`: {mode['title']}")
@@ -358,9 +360,9 @@ async def cmd_mode(message: types.Message) -> None:
         await message.answer("Неизвестный режим. Используй /help.")
         return
     CURRENT_GLOBAL_MODE = requested
-    await message.answer(f"🔥 Режим изменен на: **{MODES[requested]['title']}**", parse_mode="Markdown")
+    await message.answer(f"🔥 Врублен режим: **{MODES[requested]['title']}**", parse_mode="Markdown")
 
-# Фоновые процессы Render
+# Фоновые пинги Render
 async def keep_alive():
     await asyncio.sleep(30)
     async with aiohttp.ClientSession() as session:
