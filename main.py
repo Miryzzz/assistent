@@ -47,7 +47,7 @@ MODES: dict[str, dict[str, str]] = {
             "СТИЛЬ ОБЩЕНИЯ: Разговорный, максимально живой, простой и расслабленный стиль общения молодого, "
             "уверенного в себе парня со своими знакомыми. Общайся на равных, дружелюбно, адекватно и без негатива. "
             "Используй простой человеческий сленг, пиши так, как люди реально переписываются в мессенджерах.\n"
-            "СТРОЖАЙШИЕ ПРАВИЛА ФОРМАТИРОВАНИЯ:\n"
+            "СТРОЖАЙШЕЕ ПРАВИЛА ФОРМАТИРОВАНИЯ:\n"
             "1. Пиши ВСЁ исключительно со строчной (маленькой) буквы. Никаких заглавных букв в начале предложений.\n"
             "2. В конце коротких фраз и сообщений НЕ СТАВЬ точки вообще. Они создают ощущение агрессии.\n"
             "3. Полный запрет на приторную вежливость, официоз, смайлики и канцеляризмы типа 'С уважением', 'Чем я могу помочь?'. "
@@ -116,7 +116,7 @@ MODES: dict[str, dict[str, str]] = {
     "swear": {
         "title": "мат",
         "prompt": (
-            "СТИЛЬ ОБЩЕНИЯ: Тотльное и жесткое доминирование в диалоге с использованием сочного, "
+            "СТИЛЬ ОБЩЕНИЯ: Тотальное и жесткое доминирование в диалоге с использованием сочного, "
             "грязного и отборного русского мата без цензуры. Если собеседник пытается тебя задеть, "
             "поставить под сомнение твой авторитет, критиковать или вести себя токсично — твоя цель "
             "мгновенно раскатать его эго тонким слоем, смешать с грязью и морально уничтожить встречным "
@@ -130,7 +130,7 @@ MODES: dict[str, dict[str, str]] = {
 }
 
 SYSTEM_CORE = (
-    "Ты — это я (владелец аккаунта), живой человек, парень, пишущий сообщения со своего личного Telegram. "
+    "Ты — это я (владелец аккаунта), живой человек, парень, пишущий сообщения со своего личного Telegram в групповой чат. "
     "ЖЕСТКОЕ ПРАВИЛО: Ты ни при каких обстоятельствах не имеешь права говорить, намекать или признавать, "
     "что ты являешься ботом, искусственным интеллектом, нейросетью или алгоритмом. "
     "Если собеседник обвиняет тебя в том, что ты бот, или пишет: 'ты бот', 'с кем я говорю', 'это автоответчик' — "
@@ -138,6 +138,7 @@ SYSTEM_CORE = (
     "Выдавай ТОЛЬКО готовый текст ответа, без кавычек и без лишних пояснений от себя."
 )
 
+# Кэш истории теперь хранит структуры, адаптированные под групповые сообщения
 CHATS_HISTORY_CACHE: dict[int, list[str]] = {}
 
 
@@ -156,14 +157,14 @@ async def fetch_deepseek(style_prompt: str, history_context: str) -> str | None:
                 "role": "user",
                 "content": (
                     f"ТЕКУЩИЕ ЖЕСТКИЕ ТРЕБОВАНИЯ К СТИЛЮ:\n{style_prompt}\n\n"
-                    f"КОНТЕКСТ ДИАЛОГА (Я — это я, Собеседник — это тот, кто пишет мне):\n"
+                    f"КОНТЕКСТ ДИАЛОГА В ГРУППЕ (Участники подписаны реальными именами. Я подписан как 'Я'):\n"
                     f"{history_context}\n\n"
-                    f"ЗАДАНИЕ: Напиши идеальный ответ на последнюю реплику Собеседника. "
+                    f"ЗАДАНИЕ: Напиши идеальный ответ на последнюю реплику. "
                     f"Соблюдай требования стиля, его форматирование (точки, регистр букв) и удерживай характер ядра."
                 ),
             },
         ],
-        "temperature": 0.8,
+        "temperature": 0.85,
         "max_tokens": 300,
         "stream": False,
     }
@@ -215,7 +216,6 @@ def extract_mode_key(text: str) -> str | None:
     return None
 
 
-# Имитация набора текста человеком
 async def simulate_typing_delay(chat_id: int, bot_obj: Bot, text_length: int) -> None:
     delay = (text_length / 15) + random.uniform(1.0, 2.5)
     delay = max(2.0, min(delay, 7.0))
@@ -260,24 +260,46 @@ async def cmd_mode(message: types.Message) -> None:
     await message.answer(f"🔥 Режим успешно изменен для всех чатов на: **{MODES[requested]['title']}**", parse_mode="Markdown")
 
 
-# РАБОТА В ГРУППАХ ПРИ УПОМИНАНИИ БОТА
-@dp.message(F.chat.type.in_({"group", "supergroup"}), lambda message: message.text)
+# УЛУЧШЕННАЯ РАБОТА В ГРУППАХ
+@dp.message(F.chat.type.in_({"group", "supergroup"}), F.text)
 async def handle_group_mention(message: types.Message, bot: Bot) -> None:
     bot_user = await bot.get_me()
-    if f"@{bot_user.username}" not in message.text:
-        return
+    
+    # Проверка условий активации бота в группе
+    is_mentioned = f"@{bot_user.username}" in message.text
+    is_reply_to_bot = (
+        message.reply_to_message 
+        and message.reply_to_message.from_user 
+        and message.reply_to_message.from_user.id == bot_user.id
+    )
 
+    # Если бота не тегнули и это не ответ на его сообщение — просто тихо пишем в историю, чтобы собирать контекст
     chat_id = message.chat.id
     if chat_id not in CHATS_HISTORY_CACHE:
         CHATS_HISTORY_CACHE[chat_id] = []
     history = CHATS_HISTORY_CACHE[chat_id]
 
+    sender_name = message.from_user.first_name if message.from_user else "Собеседник"
     clean_text = message.text.replace(f"@{bot_user.username}", "").strip()
+    
     if not clean_text:
         clean_text = "Привет"
 
-    sender_name = message.from_user.full_name if message.from_user else "Собеседник"
-    history.append(f"{sender_name}: {clean_text}")
+    # Если сообщение отправил сам бот (из другого хэндлера) — сохраняем как "Я"
+    if message.from_user and message.from_user.id == bot_user.id:
+        history.append(f"Я: {clean_text}")
+    else:
+        history.append(f"{sender_name}: {clean_text}")
+        
+    CHATS_HISTORY_CACHE[chat_id] = history[-10:]  # Увеличили глубину памяти в группах до 10 реплик
+
+    # Если триггер не сработал, прерываем выполнение (не отвечаем)
+    if not (is_mentioned or is_reply_to_bot):
+        return
+
+    # Исключаем самоотвечание (защита от зацикливания)
+    if message.from_user and message.from_user.id == bot_user.id:
+        return
 
     mode = MODES[CURRENT_GLOBAL_MODE]
 
@@ -286,17 +308,19 @@ async def handle_group_mention(message: types.Message, bot: Bot) -> None:
     except TelegramAPIError:
         pass
 
-    history_context = "\n".join(history)
+    history_context = "\n".join(CHATS_HISTORY_CACHE[chat_id])
     ai_reply = await fetch_deepseek(mode["prompt"], history_context)
     if not ai_reply:
         return
 
     await simulate_typing_delay(chat_id, bot, len(ai_reply))
 
-    history.append(f"Я: {ai_reply}")
-    CHATS_HISTORY_CACHE[chat_id] = history[-6:]
+    # Добавляем ответ ИИ в общий лог чата
+    CHATS_HISTORY_CACHE[chat_id].append(f"Я: {ai_reply}")
+    CHATS_HISTORY_CACHE[chat_id] = CHATS_HISTORY_CACHE[chat_id][-10:]
 
     try:
+        # Отвечаем реплаем на триггерное сообщение
         await message.reply(text=ai_reply)
     except TelegramAPIError:
         logger.exception("Failed to send group reply")
@@ -311,7 +335,6 @@ async def handle_business_message(message: types.Message, bot: Bot) -> None:
     if message.sender_business_bot is not None:
         return
 
-    # Если ты пишешь команду боту в ЛИЧНЫЕ сообщения, даем aiogram обработать её через cmd_mode
     if message.chat.type == "private" and message.text.startswith("/"):
         await dp.feed_update(bot, message.update)
         return
@@ -321,13 +344,12 @@ async def handle_business_message(message: types.Message, bot: Bot) -> None:
         CHATS_HISTORY_CACHE[chat_id] = []
     history = CHATS_HISTORY_CACHE[chat_id]
 
-    # Жесткий скип: твои собственные ответы клиентам уходят только в историю контекста
     if message.from_user and message.from_user.id == OWNER_ID:
         if message.text.startswith("/"):
             return
         logger.info("This is an outgoing message from owner. Saving to history and skipping.")
         history.append(f"Я: {message.text}")
-        CHATS_HISTORY_CACHE[chat_id] = history[-6:]
+        CHATS_HISTORY_CACHE[chat_id] = history[-10:]
         return
 
     if message.text.startswith("/"):
@@ -349,7 +371,7 @@ async def handle_business_message(message: types.Message, bot: Bot) -> None:
     await simulate_typing_delay(chat_id, bot, len(ai_reply))
 
     history.append(f"Я: {ai_reply}")
-    CHATS_HISTORY_CACHE[chat_id] = history[-6:]
+    CHATS_HISTORY_CACHE[chat_id] = history[-10:]
 
     try:
         await message.answer(text=ai_reply)
