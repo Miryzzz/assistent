@@ -40,31 +40,29 @@ CURRENT_GLOBAL_MODE = "soft"
 
 RANDOM_REACTIONS = ["🔥", "🤡", "🗿", "😂", "💀", "👍", "👀"]
 
-# 📸 Твоя база мемов (Прямые ссылки на картинки)
-# Можешь добавлять свои ключевые слова и ссылки
+# 📸 База мемов (Ссылки из ТГ-каналов работают надежнее всего)
 MEMES_DATABASE = {
-    "сигма": "https://i.postimg.cc/mD8zZ081/sigma.jpg",
-    "фейспалм": "https://i.postimg.cc/4N3K3mY3/facepalm.jpg",
-    "пон": "https://i.postimg.cc/85zXpXyL/pon.jpg",
-    "клоун": "https://i.postimg.cc/76SgX6Xv/clown.jpg",
-    "кринж": "https://i.postimg.cc/9Q2b6MvC/cringe.jpg",
-    "база": "https://i.postimg.cc/G3x7hP8L/baza.jpg"
+    "сигма": "https://t.me/baza_memov_bot_storage/2",
+    "фейспалм": "https://t.me/baza_memov_bot_storage/3",
+    "пон": "https://t.me/baza_memov_bot_storage/4",
+    "клоун": "https://t.me/baza_memov_bot_storage/5",
+    "кринж": "https://t.me/baza_memov_bot_storage/6",
+    "база": "https://t.me/baza_memov_bot_storage/7"
 }
 
-# 🎬 Твоя база GIF (Прямые ссылки на гифки или mp4-анимации)
+# 🎬 База GIF
 GIFS_DATABASE = {
-    "чил": "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExM3BwZ3Z0cmR0Ynd5N3R5ZXg4Z3M4Z3R5ZXg4Z3M4Z3R5ZXg4Z3M4Z/l41YvpiA9uMWw5AMU/giphy.gif",
-    "фейл": "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExbW1wY3g0dzVxd3R6M3R5ZXg4Z3M4Z3R5ZXg4Z3M4Z3R5ZXg4Z/3LOXv99X7V6Q8/giphy.gif",
-    "инсульт": "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExbXN6M3R5ZXg4Z3M4Z3R5ZXg4Z3M4Z3R5ZXg4Z3M4Z3R5ZXg4Z/l3q2K1M6w1tAJA8iA/giphy.gif",
-    "шок": "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExN3B3N3R5ZXg4Z3M4Z3R5ZXg4Z3M4Z3R5ZXg4Z3M4Z3R5ZXg4Z/11ykUODWZvfHMc/giphy.gif"
+    "чилл": "https://media.giphy.com/media/l41YvpiA9uMWw5AMU/giphy.gif",
+    "фейл": "https://media.giphy.com/media/3LOXv99X7V6Q8/giphy.gif",
+    "инсульт": "https://media.giphy.com/media/l3q2K1M6w1tAJA8iA/giphy.gif",
+    "шок": "https://media.giphy.com/media/11ykUODWZvfHMc/giphy.gif"
 }
 
-# Модернизируем промпт: объясняем ИИ, как вызывать картинки и гифки
 MEDIA_INSTRUCTION = (
     f"\n\nУ тебя есть суперсила — ты можешь отправлять в чат мемы или GIF, если они идеально подходят под рофл или ситуацию. "
     f"Если хочешь отправить МЕМ, напиши строго в теле ответа (без другого текста): [send_meme:название_мема]. "
     f"Доступные мемы: {', '.join(MEMES_DATABASE.keys())}.\n"
-    f"If хочешь отправить ГИФКУ, напиши строго в теле ответа: [send_gif:название_гифки]. "
+    f"Если хочешь отправить ГИФКУ, напиши строго в теле ответа: [send_gif:название_гифки]. "
     f"Доступные гифки: {', '.join(GIFS_DATABASE.keys())}.\n"
     f"Применяй медиа-теги редко (с шансом ~15-20%), только когда это реально разрыв контекста. В остальных случаях отвечай текстом."
 )
@@ -168,11 +166,9 @@ async def fetch_deepseek(style_prompt: str, history_context: str) -> str | None:
             return None
 
 
-# 🛠 Функция-обработчик: решает, как именно отправить ответ (текст, фото или гиф)
+# 🛠 УМНАЯ И ЗАЩИЩЕННАЯ ОТПРАВКА МЕДИА / ТЕКСТА
 async def send_smart_reply(message: types.Message, ai_reply: str, is_business: bool = False) -> None:
-    # Проверка на команду отправки мема [send_meme:имя]
     meme_match = re.search(r"\[send_meme:(.*?)\]", ai_reply)
-    # Проверка на команду отправки гифки [send_gif:имя]
     gif_match = re.search(r"\[send_gif:(.*?)\]", ai_reply)
 
     try:
@@ -180,31 +176,47 @@ async def send_smart_reply(message: types.Message, ai_reply: str, is_business: b
             key = meme_match.group(1).strip().lower()
             if key in MEMES_DATABASE:
                 await message.bot.send_chat_action(chat_id=message.chat.id, action=ChatAction.UPLOAD_PHOTO)
-                if is_business:
-                    await message.answer_photo(photo=MEMES_DATABASE[key])
-                else:
-                    await message.reply_photo(photo=MEMES_DATABASE[key])
-                return
+                try:
+                    if is_business:
+                        sent_msg = await message.answer_photo(photo=MEMES_DATABASE[key])
+                    else:
+                        sent_msg = await message.reply_photo(photo=MEMES_DATABASE[key])
+                    
+                    if sent_msg.photo:
+                        logger.info(f"🔥 УСПЕХ! file_id для мема '{key}': {sent_msg.photo[-1].file_id}")
+                    return
+                except TelegramAPIError as e:
+                    logger.error(f"Не удалось отправить мем {key} по ссылке: {e}. Переключаемся на текст.")
+                    await message.answer(text=f"должен был быть мем про {key}, но хостинг картинок опять лег")
+                    return
         
         elif gif_match:
             key = gif_match.group(1).strip().lower()
             if key in GIFS_DATABASE:
                 await message.bot.send_chat_action(chat_id=message.chat.id, action=ChatAction.UPLOAD_DOCUMENT)
-                if is_business:
-                    await message.answer_animation(animation=GIFS_DATABASE[key])
-                else:
-                    await message.reply_animation(animation=GIFS_DATABASE[key])
-                return
+                try:
+                    if is_business:
+                        sent_msg = await message.answer_animation(animation=GIFS_DATABASE[key])
+                    else:
+                        sent_msg = await message.reply_animation(animation=GIFS_DATABASE[key])
+                    
+                    if sent_msg.animation:
+                        logger.info(f"🔥 УСПЕХ! file_id для гифки '{key}': {sent_msg.animation.file_id}")
+                    return
+                except TelegramAPIError as e:
+                    logger.error(f"Не удалось отправить гифку {key} по ссылке: {e}. Переключаемся на текст.")
+                    await message.answer(text=f"тут должна быть гифка {key}, но чето пошло не по плану")
+                    return
 
-        # Если тегов нет — отправляем обычный зумерский текст в нижнем регистре
+        # Если обычный текст — принудительно переводим в нижний регистр зумер-мода
         final_text = ai_reply.lower()
         if is_business:
             await message.answer(text=final_text)
         else:
             await message.reply(text=final_text)
 
-    except TelegramAPIError:
-        logger.exception("Ошибка отправки медиа/текстового ответа")
+    except Exception as exc:
+        logger.exception("Глобальный сбой в функции send_smart_reply: %s", exc)
 
 
 async def simulate_typing_delay(chat_id: int, bot_obj: Bot, text_length: int) -> None:
@@ -242,6 +254,7 @@ async def handle_group_mention(message: types.Message, bot: Bot) -> None:
     if not (is_mentioned or is_reply_to_bot) or (message.from_user and message.from_user.id == bot_user.id):
         return
 
+    # Шанс 12% просто шлепнуть зумерскую реакцию вместо текста
     if random.random() < 0.12:
         try:
             await message.react([types.ReactionTypeEmoji(emoji=random.choice(RANDOM_REACTIONS))])
@@ -261,15 +274,12 @@ async def handle_group_mention(message: types.Message, bot: Bot) -> None:
         return
 
     await simulate_typing_delay(chat_id, bot, len(ai_reply))
-    
-    # Сохраняем чистый ответ ИИ в историю
     CHATS_HISTORY_CACHE[chat_id].append(f"Я: {ai_reply}")
     
-    # Отправляем через умный метод (картинка/гифка/текст)
     await send_smart_reply(message, ai_reply, is_business=False)
 
 
-# БИЗНЕС ХЭНДЛЕР (ЛИЧКА)
+# БИЗНЕС ХЭНДЛЕР (ЛИЧКА ЧЕРЕЗ TELEGRAM BUSINESS API)
 @dp.business_message(F.text)
 async def handle_business_message(message: types.Message, bot: Bot) -> None:
     if not message.business_connection_id or message.sender_business_bot is not None:
@@ -308,7 +318,32 @@ async def handle_business_message(message: types.Message, bot: Bot) -> None:
     await send_smart_reply(message, ai_reply, is_business=True)
 
 
-# Управление режимами (оставляем без изменений)
+# Управление режимами
+def mode_help_text() -> str:
+    lines = [
+        "🤖 **Бизнес-бот активен.**",
+        f"Текущий глобальный режим для всех чатов: `[{MODES[CURRENT_GLOBAL_MODE]['title']}]`",
+        "",
+        "**Смена режима:**",
+        "- `/mode <ключ>`",
+        "- `/mode_<ключ>`",
+        "",
+        "**Доступные режимы:**",
+    ]
+    for key, mode in MODES.items():
+        lines.append(f"- `{key}`: {mode['title']}")
+    return "\n".join(lines)
+
+def extract_mode_key(text: str) -> str | None:
+    value = text.strip()
+    if value.startswith("/mode_"):
+        return value.replace("/mode_", "", 1).split()[0].strip().lower()
+    if value.startswith("/mode"):
+        parts = value.split(maxsplit=1)
+        if len(parts) == 2:
+            return parts[1].strip().lower()
+    return None
+
 @dp.message(Command("start", "help"), F.chat.type == "private")
 async def cmd_start(message: types.Message) -> None:
     if message.from_user.id != OWNER_ID: return
@@ -325,6 +360,7 @@ async def cmd_mode(message: types.Message) -> None:
     CURRENT_GLOBAL_MODE = requested
     await message.answer(f"🔥 Режим изменен на: **{MODES[requested]['title']}**", parse_mode="Markdown")
 
+# Фоновые процессы Render
 async def keep_alive():
     await asyncio.sleep(30)
     async with aiohttp.ClientSession() as session:
