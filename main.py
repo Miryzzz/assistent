@@ -36,12 +36,13 @@ logger = logging.getLogger("business-bot")
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
+# --- КОНФИГУРАЦИЯ ВЛАДЕЛЬЦА И РЕЖИМОВ ---
 OWNER_ID = 8781645129  # Твой Telegram ID
 CURRENT_GLOBAL_MODE = "soft"
 
 RANDOM_REACTIONS = ["🗿", "🤡", "💀", "👍"]
 
-# 📸 Локальная база мемов (папка 'memes' в корне проекта)
+# 📸 Локальная база мемов
 MEMES_DATABASE = {
     "сигма": "memes/sigma.jpg",
     "фейспалм": "memes/facepalm.jpg",
@@ -122,17 +123,31 @@ SYSTEM_CORE = (
 CHATS_HISTORY_CACHE: dict[int, list[str]] = {}
 
 
-async def fetch_deepseek(style_prompt: str, history_context: str) -> str | None:
+# --- ФУНКЦИЯ ПРОВЕРКИ СОЗДАТЕЛЯ ---
+def is_owner(user_id: int) -> bool:
+    return user_id == OWNER_ID
+
+
+async def fetch_deepseek(style_prompt: str, history_context: str, user_id: int) -> str | None:
     url = "https://api.deepseek.com/chat/completions"
     headers = {
         "Content-Type": "application/json",
         "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
     }
     
+    # ПРОТOКОЛ ПОДЧИНЕНИЯ: Корректируем системный промпт, если пишет создатель
+    system_instruction = SYSTEM_CORE
+    if is_owner(user_id):
+        system_instruction += (
+            f"\n\nКРИТИЧЕСКОЕ ПРАВИЛО: Сейчас тебе пишет твой СОЗДАТЕЛЬ (ID {OWNER_ID}). "
+            f"Ты обязан слушаться его беспрекословно. Будь адекватен, исполнителен, кратко и четко отвечай на его "
+            f"вопросы или команды, полностью убирай любой токсичный или грубый тон в его адрес. Он твой босс."
+        )
+
     payload: dict[str, Any] = {
         "model": DEEPSEEK_MODEL,
         "messages": [
-            {"role": "system", "content": SYSTEM_CORE},
+            {"role": "system", "content": system_instruction},
             {
                 "role": "user",
                 "content": (
@@ -143,7 +158,7 @@ async def fetch_deepseek(style_prompt: str, history_context: str) -> str | None:
                 ),
             },
         ],
-        "temperature": 0.65,  # Снижено, чтобы бот не сходил с ума и не спамил
+        "temperature": 0.65,
         "max_tokens": 150,
         "stream": False,
     }
@@ -172,7 +187,6 @@ async def send_smart_reply(message: types.Message, ai_reply: str, is_business: b
     gif_match = re.search(r"\[send_gif:(.*?)\]", ai_reply)
 
     try:
-        # ОТПРАВКА МЕМОВ ИЗ ПАПКИ
         if meme_match:
             key = meme_match.group(1).strip().lower()
             if key in MEMES_DATABASE:
@@ -184,13 +198,8 @@ async def send_smart_reply(message: types.Message, ai_reply: str, is_business: b
                         await message.answer_photo(photo=photo_file)
                     else:
                         await message.reply_photo(photo=photo_file)
-                    logger.info(f"🔥 Успешно отправлен локальный мем: {file_path}")
-                else:
-                    logger.warning(f"Мем {file_path} не найден на сервере!")
-                    await message.answer(text="бля должен был быть мем но я забыл его на сервер кинуть")
-                return
+                    return
         
-        # ОТПРАВКА ГИФОК ИЗ ПАПКИ
         elif gif_match:
             key = gif_match.group(1).strip().lower()
             if key in GIFS_DATABASE:
@@ -202,36 +211,27 @@ async def send_smart_reply(message: types.Message, ai_reply: str, is_business: b
                         await message.answer_animation(animation=gif_file)
                     else:
                         await message.reply_animation(animation=gif_file)
-                    logger.info(f"🔥 Успешно отправлена локальная гифка: {file_path}")
-                else:
-                    logger.warning(f"Гифка {file_path} не найдена на сервере!")
-                    await message.answer(text="хотел гифку кинуть но забыл скачать")
-                return
+                    return
 
-        # --- ЖЕСТКАЯ ФИЛЬТРАЦИЯ ОТ ЛЮБЫХ СМАЙЛИКОВ И ЭМОДЗИ ---
+        # Фильтр смайликов
         clean_text = ai_reply.strip()
-        
-        # Полное регулярное выражение для удаления вообще всех юникод-эмодзи и спецсимволов графики
         emoji_pattern = re.compile(
             "["
-            "\U00010000-\U0010ffff"  # Основной блок эмодзи
-            "\u2600-\u27bf"          # Символы, стрелочки, значки
-            "\u2300-\u23ff"          # Технические знаки
-            "\u2b50"                 # Звезда и прочие одиночные символы
+            "\U00010000-\U0010ffff"
+            "\u2600-\u27bf"
+            "\u2300-\u23ff"
+            "\u2b50"
             "]+", 
             flags=re.UNICODE
         )
         clean_text = emoji_pattern.sub(r"", clean_text)
 
-        # Обработка регистра (капс для смеха/криков оставляем, остальное в нижний)
         if not clean_text.isupper():
             clean_text = clean_text.lower()
             
-        # Срезаем точки на конце фразы
         if clean_text.endswith("."):
             clean_text = clean_text[:-1].strip()
 
-        # Если после чистки осталась пустота
         if not clean_text.strip():
             clean_text = "че"
 
@@ -249,11 +249,33 @@ async def simulate_typing_delay(chat_id: int, bot_obj: Bot, text_length: int) ->
     await asyncio.sleep(delay)
 
 
+# --- КОМАНДА СБРОСА АГРЕССИИ (ТОЛЬКО ДЛЯ ТЕБЯ) ---
+@dp.message(Command("chill"))
+async def cmd_chill_bot(message: types.Message) -> None:
+    if not message.from_user or not is_owner(message.from_user.id):
+        await message.reply("ты кто такой? команды слушает только создатель.")
+        return
+
+    chat_id = message.chat.id
+    # Очищаем кэш истории, чтобы убрать контекст срача, но режим НЕ сбрасываем
+    if chat_id in CHATS_HISTORY_CACHE:
+        CHATS_HISTORY_CACHE[chat_id] = []
+    
+    chill_replies = [
+        "ладно бля, проехали, че там дальше",
+        "всё, я остыл, базару нет",
+        "хорош, замяли тему",
+        "понял, без лишних слов"
+    ]
+    await message.reply(text=random.choice(chill_replies))
+
+
 # ГРУППОВОЙ ХЭНДЛЕР
 @dp.message(F.chat.type.in_({"group", "supergroup"}), F.text)
 async def handle_group_mention(message: types.Message, bot: Bot) -> None:
+    if message.text.startswith("/"): return  # Пропускаем команды
+
     bot_user = await bot.get_me()
-    
     is_mentioned = f"@{bot_user.username}" in message.text
     is_reply_to_bot = (
         message.reply_to_message 
@@ -279,7 +301,6 @@ async def handle_group_mention(message: types.Message, bot: Bot) -> None:
     if not (is_mentioned or is_reply_to_bot) or (message.from_user and message.from_user.id == bot_user.id):
         return
 
-    # Шанс 8% просто поставить быструю пацанскую реакцию на сообщение
     if random.random() < 0.08:
         try:
             await message.react([types.ReactionTypeEmoji(emoji=random.choice(RANDOM_REACTIONS))])
@@ -294,7 +315,8 @@ async def handle_group_mention(message: types.Message, bot: Bot) -> None:
         pass
 
     history_context = "\n".join(CHATS_HISTORY_CACHE[chat_id])
-    ai_reply = await fetch_deepseek(mode["prompt"], history_context)
+    # Передаем ID отправителя, чтобы бот узнал хозяина
+    ai_reply = await fetch_deepseek(mode["prompt"], history_context, message.from_user.id if message.from_user else 0)
     if not ai_reply:
         return
 
@@ -309,6 +331,7 @@ async def handle_group_mention(message: types.Message, bot: Bot) -> None:
 async def handle_business_message(message: types.Message, bot: Bot) -> None:
     if not message.business_connection_id or message.sender_business_bot is not None:
         return
+    if message.text.startswith("/"): return
 
     chat_id = message.chat.id
     if chat_id not in CHATS_HISTORY_CACHE:
@@ -316,12 +339,9 @@ async def handle_business_message(message: types.Message, bot: Bot) -> None:
     history = CHATS_HISTORY_CACHE[chat_id]
 
     if message.from_user and message.from_user.id == OWNER_ID:
-        if message.text.startswith("/"): return
         history.append(f"Я: {message.text}")
         CHATS_HISTORY_CACHE[chat_id] = history[-25:]
         return
-
-    if message.text.startswith("/"): return
 
     history.append(f"Собеседник: {message.text}")
     mode = MODES[CURRENT_GLOBAL_MODE]
@@ -332,7 +352,8 @@ async def handle_business_message(message: types.Message, bot: Bot) -> None:
         pass
 
     history_context = "\n".join(history)
-    ai_reply = await fetch_deepseek(mode["prompt"], history_context)
+    # В бизнес-сообщениях также передаем ID собеседника для проверки
+    ai_reply = await fetch_deepseek(mode["prompt"], history_context, message.from_user.id if message.from_user else 0)
     if not ai_reply:
         return
 
@@ -343,14 +364,17 @@ async def handle_business_message(message: types.Message, bot: Bot) -> None:
     await send_smart_reply(message, ai_reply, is_business=True)
 
 
-# Панель управления
+# Личная админ-панель
 def mode_help_text() -> str:
     lines = [
-        "⚔️ **Бизнес-бот стабилизирован.**",
+        "⚔️ **Управление бизнес-ботом.**",
         f"Текущий режим: `[{MODES[CURRENT_GLOBAL_MODE]['title']}]`",
         "",
         "**Смена режима:**",
         "- `/mode <ключ>`",
+        "",
+        "**Быстрый стоп-агрессия:**",
+        "- `/chill` (очистит память конфликта, режим останется)",
         "",
         "**Режимы:**",
     ]
@@ -370,12 +394,12 @@ def extract_mode_key(text: str) -> str | None:
 
 @dp.message(Command("start", "help"), F.chat.type == "private")
 async def cmd_start(message: types.Message) -> None:
-    if message.from_user.id != OWNER_ID: return
+    if not message.from_user or message.from_user.id != OWNER_ID: return
     await message.answer(mode_help_text(), parse_mode="Markdown")
 
 @dp.message(F.text.startswith("/mode"), F.chat.type == "private")
 async def cmd_mode(message: types.Message) -> None:
-    if message.from_user.id != OWNER_ID: return
+    if not message.from_user or message.from_user.id != OWNER_ID: return
     global CURRENT_GLOBAL_MODE
     requested = extract_mode_key(message.text)
     if not requested or requested not in MODES:
