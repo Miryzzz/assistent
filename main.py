@@ -64,7 +64,7 @@ GIFS_DATABASE = {
 
 SCHEDULE_INSTRUCTION = (
     "\n\nПРАВИЛО РАСПИСАНИЯ: Если тебя просят показать расписание, "
-    "отвечай СТРОГО одной фразой: /schedule"
+    "отвечай СТРОГО одной фразой: /tomorrow"
 )
 
 MEDIA_INSTRUCTION = (
