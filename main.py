@@ -5,6 +5,8 @@ import random
 import re
 from typing import Any
 
+import emoji
+
 import aiohttp
 from aiohttp import web
 from aiogram import Bot, Dispatcher, F, types
@@ -44,20 +46,20 @@ RANDOM_REACTIONS = ["🗿", "🤡", "💀", "👍"]
 
 # 📸 Локальная база мемов
 MEMES_DATABASE = {
-    "сигма": "memes/sigma.jpg",
-    "фейспалм": "memes/facepalm.jpg",
-    "пон": "memes/pon.jpg",
-    "клоун": "memes/clown.jpg",
-    "кринж": "memes/cringe.jpg",
-    "база": "memes/baza.jpg"
+    "сигма": "https://static.boredpanda.com/blog/wp-content/uploads/2024/06/sigma-face-6.jpg",
+    "фейспалм": "https://mediaproxy.tvtropes.org/width/1200/https://static.tvtropes.org/pmwiki/pub/images/facepalm_deja_q.jpg",
+    "пон": "https://preview.redd.it/what-does-%D0%BF%D0%BE%D0%BD-mean-v0-96swkzb2rabb1.jpeg?width=1000&format=pjpg&auto=webp&s=68ba935669c211fd0079a139786f7597aea0a7bc",
+    "клоун": "https://www.calend.ru/img/content/i3/3374.jpg",
+    "кринж": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQcGCqBIRt_5zH_KcaHKBE2s5kq7UO7Kjojaw&s",
+    "база": "https://n1s1.hsmedia.ru/c0/dc/40/c0dc40d0a85f119184efd0808b8ce167/750x593_0xQjYeGySo_9723605899019290543.jpg"
 }
 
 # 🎬 База GIF
 GIFS_DATABASE = {
-    "чилл": "memes/chill.gif",
-    "фейл": "memes/fail.gif",
-    "инсульт": "memes/insult.gif",
-    "шок": "memes/shock.gif"
+    "чилл": "https://media1.giphy.com/media/v1.Y2lkPTZjMDliOTUyOTF2d2M2Y2dzcmFzYmdsbzV6dHVnMnAzM2l4MzUzaWhrZ3FkYmpiYSZlcD12MV9naWZzX3NlYXJjaCZjdD1n/cmhIggx11YJNC14dH6/200.gif",
+    "флей": "memes/fail.gif",
+    "инсульт": "https://media.tenor.com/R7FvyGcjdjkAAAAM/blinky.gif",
+    "шок": "https://media.tenor.com/9RsYHkzRE0EAAAAM/shock-shocker.gif"
 }
 
 MEDIA_INSTRUCTION = (
@@ -214,17 +216,8 @@ async def send_smart_reply(message: types.Message, ai_reply: str, is_business: b
                     return
 
         # Фильтр смайликов
-        clean_text = ai_reply.strip()
-        emoji_pattern = re.compile(
-            "["
-            "\U00010000-\U0010ffff"
-            "\u2600-\u27bf"
-            "\u2300-\u23ff"
-            "\u2b50"
-            "]+", 
-            flags=re.UNICODE
-        )
-        clean_text = emoji_pattern.sub(r"", clean_text)
+        clean_text = emoji.replace_emoji(ai_reply, replace='')
+        clean_text = clean_text.strip()
 
         if not clean_text.isupper():
             clean_text = clean_text.lower()
@@ -235,10 +228,11 @@ async def send_smart_reply(message: types.Message, ai_reply: str, is_business: b
         if not clean_text.strip():
             clean_text = "че"
 
-        if is_business:
-            await message.answer(text=clean_text)
-        else:
-            await message.reply(text=clean_text)
+        if is_business: await message.answer(text=clean_text)
+        else: await message.reply(text=clean_text)
+
+    except Exception as exc:
+        logger.exception("Ошибка в send_smart_reply: %s", exc)
 
     except Exception as exc:
         logger.exception("Глобальный сбой в функции send_smart_reply: %s", exc)
