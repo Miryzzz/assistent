@@ -4,3 +4,4 @@ python-dotenv>=1.0.1
 aiogram
 aiohttp
 python-dotenv
+emoji
