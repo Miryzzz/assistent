@@ -62,6 +62,11 @@ GIFS_DATABASE = {
     "шок": "https://media.tenor.com/9RsYHkzRE0EAAAAM/shock-shocker.gif"
 }
 
+SCHEDULE_INSTRUCTION = (
+    "\n\nПРАВИЛО РАСПИСАНИЯ: Если тебя просят показать расписание, "
+    "отвечай СТРОГО одной фразой: /schedule"
+)
+
 MEDIA_INSTRUCTION = (
     f"\n\nПРАВИЛО МЕДИА-ТЕГОВ: Если ситуация ИДЕАЛЬНО подходит под мем или гифку, ты можешь отправить тег вместо текста. "
     f"Для мема пиши строго: [send_meme:название_мема]. Доступны: {', '.join(MEMES_DATABASE.keys())}.\n"
@@ -247,7 +252,7 @@ async def simulate_typing_delay(chat_id: int, bot_obj: Bot, text_length: int) ->
 @dp.message(Command("chill"))
 async def cmd_chill_bot(message: types.Message) -> None:
     if not message.from_user or not is_owner(message.from_user.id):
-        await message.reply("ты кто такой? команды слушает только создатель.")
+        await message.reply("ты кто такой? команды слушаю только от создателя.")
         return
 
     chat_id = message.chat.id
